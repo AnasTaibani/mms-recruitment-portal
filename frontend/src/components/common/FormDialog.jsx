@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -64,7 +64,7 @@ function buildSchema(fields) {
   fields.forEach((f) => {
     let s;
     if (f.type === "number") {
-      s = z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number({ invalid_type_error: "Must be a number" }).min(f.min ?? 0, `Min ${f.min ?? 0}`).nullable());
+      s = z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number({ invalid_type_error: "Must be a number" }).min(f.min ?? 0, `Min ${f.min ?? 0}`).max(f.max ?? Number.MAX_SAFE_INTEGER, f.maxMessage || `Max ${f.max}`).nullable());
       if (f.required) s = s.refine((v) => v !== null, "Required");
     } else if (f.type === "multi") {
       s = z.array(z.string()).default([]);
@@ -99,9 +99,25 @@ function FieldInput({ f, field, list, testid }) {
 export function FormDialog({ open, onOpenChange, title, description, fields, initial, onSubmit, submitLabel = "Save", testid = "form", wide, children }) {
   const { list } = useAuth();
   const schema = useMemo(() => buildSchema(fields), [fields]);
-  const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema) });
+  const { control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema) });
+  const values = watch();
+  // fields with `derive` recalculate only when a field they depend on changes (e.g. Amount = CTC × Fee %)
+  const depKey = JSON.stringify(fields.filter((f) => f.derive).map((f) => f.derive.from.map((k) => values?.[k] ?? "")));
+  const lastDeps = useRef(null);
   useEffect(() => {
-    if (open) reset(Object.fromEntries(fields.map((f) => [f.name, initial?.[f.name] ?? (f.type === "multi" ? [] : f.default ?? "")])));
+    if (lastDeps.current !== null && lastDeps.current !== depKey) {
+      fields.filter((f) => f.derive).forEach((f) => {
+        const v = f.derive.fn(values || {});
+        if (v !== undefined && v !== values?.[f.name]) setValue(f.name, v);
+      });
+    }
+    lastDeps.current = depKey;
+  }, [depKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (open) {
+      lastDeps.current = null; // opening the form never recalculates saved values
+      reset(Object.fromEntries(fields.map((f) => [f.name, initial?.[f.name] ?? (f.type === "multi" ? [] : f.default ?? "")])));
+    }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const submit = async (vals) => {
     const out = Object.fromEntries(Object.entries(vals).map(([k, v]) => [k, v === "" ? null : v]));
@@ -120,7 +136,7 @@ export function FormDialog({ open, onOpenChange, title, description, fields, ini
               <div key={f.name} className={cn("space-y-1.5", (f.full || f.type === "textarea") && "sm:col-span-2")}>
                 <Label className="text-xs font-semibold text-zinc-600">{f.label}{f.required && <span className="text-rose-600"> *</span>}</Label>
                 <Controller name={f.name} control={control} render={({ field }) => <FieldInput f={f} field={field} list={list} testid={`${testid}-${f.name}`} />} />
-                {f.help && <p className="text-[11px] text-zinc-400">{f.help}</p>}
+                {f.help && <p className="text-[11px] text-zinc-400">{typeof f.help === "function" ? f.help(values || {}) : f.help}</p>}
                 {errors[f.name] && <p className="text-xs text-rose-600" data-testid={`${testid}-${f.name}-error`}>{errors[f.name].message}</p>}
               </div>
             ))}

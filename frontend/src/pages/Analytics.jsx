@@ -103,7 +103,7 @@ export default function Analytics() {
         </TabsContent>
         {d.cost && <TabsContent value="cost" className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
-            <Kpi label="Total recruitment cost" value={lakhs(d.cost.total)} testid="an-cost-total" /><Kpi label="Candidates joined" value={d.cost.hires} hint="Denominator — actual joiners only" />
+            <Kpi label="Total hiring cost" value={lakhs(d.cost.total)} hint={`CTC ${lakhs(d.cost.ctc_total)} + fees ${lakhs(d.cost.fees)}`} testid="an-cost-total" /><Kpi label="Candidates joined" value={d.cost.hires} hint="Denominator — actual joiners only" />
             <Kpi label="Cost per hire" value={d.cost.cost_per_hire === null ? "N/A" : lakhs(d.cost.cost_per_hire)} testid="an-cost-per-hire" /><Kpi label="Paid" value={lakhs(d.cost.paid)} />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">

@@ -13,7 +13,7 @@ from core import (db, get_user, require, can, today, days_between, effective_sta
                   IMPLIED_STAGE, INACTIVE)
 from routes_recruit import list_applications, list_requisitions, list_candidates
 from routes_interviews import list_interviews
-from routes_offers import list_offers, list_joinings, list_costs
+from routes_offers import list_offers, list_joinings, list_costs, hire_ctc
 
 router = APIRouter(prefix="/api")
 FUNNEL = [("Candidates Sourced", 0), ("Screening", 1), ("Shortlisted", 2), ("Interviewed", 4), ("Selected", 6),
@@ -214,16 +214,20 @@ async def compute(user, f):
                 "joined": len(hires_rows), "conversion": pct(len(hires_rows), len(rows)),
                 "avg_cycle": stats([a["_cycle"] for a in hires_rows])["avg"]}
 
-    def cost_for(field, key):
+    # Cost per hire = (CTC of each joined candidate + all consultancy / recruiter fees) ÷ number of joiners
+    ctc_map = await hire_ctc({a["candidate_id"] for a in hires}) if costs is not None else {}
+
+    def cost_for(field, key, hire_rows=()):
         if costs is None:
             return None
-        return round(sum(c["amount"] or 0 for c in costs if c.get(field) == key), 2)
+        fees = sum(c["amount"] or 0 for c in costs if c.get(field) == key)
+        return round(fees + sum(ctc_map.get(a["candidate_id"]) or 0 for a in hire_rows), 2)
 
     recruiters = []
     hg = group(lambda a: a.get("recruiter_id"), hires)
     for rid, rows in group(lambda a: a.get("recruiter_id"), apps).items():
         p = perf(rows, hg.get(rid, []))
-        total_cost = cost_for("recruiter_id", rid)
+        total_cost = cost_for("recruiter_id", rid, hg.get(rid, []))
         p |= {"recruiter_id": rid, "name": rows[0].get("recruiter") or "Unassigned", "total_cost": total_cost,
               "cost_per_hire": round(total_cost / p["joined"], 2) if total_cost is not None and p["joined"] else None,
               "workload": p["in_process"], "open_requisitions": sum(1 for r in open_reqs if r.get("recruiter_id") == rid)}
@@ -260,20 +264,26 @@ async def compute(user, f):
         if not pid:
             continue
         p = perf(rows, hp.get(pid, []))
-        tc = cost_for("partner_id", pid)
+        tc = cost_for("partner_id", pid, hp.get(pid, []))
         p |= {"partner": rows[0].get("partner"), "total_cost": tc,
               "cost_per_hire": round(tc / p["joined"], 2) if tc is not None and p["joined"] else None}
         partners.append(p)
 
     cost = None
     if costs is not None:
-        total = round(sum(c["amount"] or 0 for c in costs), 2)
+        fees = round(sum(c["amount"] or 0 for c in costs), 2)
+        ctc_total = round(sum(ctc_map.get(a["candidate_id"]) or 0 for a in hires), 2)
+        total = round(fees + ctc_total, 2)
         cats = defaultdict(float)
+        if ctc_total:
+            cats["Candidate CTC (joined)"] = ctc_total
         months = defaultdict(float)
         for c in costs:
             cats[c.get("category") or "Uncategorised"] += c["amount"] or 0
             months[(c.get("invoice_date") or "")[:7]] += c["amount"] or 0
-        cost = {"total": total, "hires": len(hires), "cost_per_hire": round(total / len(hires), 2) if hires else None,
+        cost = {"total": total, "fees": fees, "ctc_total": ctc_total, "hires": len(hires),
+                "ctc_missing": sum(1 for a in hires if ctc_map.get(a["candidate_id"]) is None),
+                "cost_per_hire": round(total / len(hires), 2) if hires else None,
                 "by_category": [{"category": k, "amount": round(v, 2)} for k, v in cats.items()],
                 "by_month": [{"month": k, "amount": round(v, 2)} for k, v in sorted(months.items()) if k],
                 "paid": round(sum(c["amount"] or 0 for c in costs if c.get("payment_status") == "Paid"), 2)}

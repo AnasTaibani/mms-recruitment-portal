@@ -308,10 +308,13 @@ class CostIn(BaseModel):
     category_id: Optional[str] = None
     recruiter_id: Optional[str] = None
     partner_id: Optional[str] = None
+    partner_name: Optional[str] = None  # free text; matched to (or added to) Master Data → Recruitment Partners
     requisition_id: Optional[str] = None
     candidate_id: Optional[str] = None
     invoice_no: Optional[str] = None
     invoice_date: Optional[str] = None
+    ctc: Optional[float] = Field(None, ge=0)                    # candidate CTC in ₹ lakhs (used in cost per hire)
+    fee_percent: Optional[float] = Field(None, ge=0, le=100)    # e.g. 8.33 for M2S, 7 for other partners
     amount: Optional[float] = Field(None, ge=0)
     payment_status: Optional[str] = None
     payment_date: Optional[str] = None
@@ -349,6 +352,38 @@ async def get_costs(request: Request, user=Depends(require("cost.view"))):
     return await list_costs(user, dict(request.query_params))
 
 
+MAX_LAKHS = 1000  # ₹10 crore — anything above is almost certainly typed in rupees instead of lakhs
+
+
+def apply_fee(data, current=None):
+    """Amount = CTC × Fee % when both are given and no amount was typed (the form fills it in the same way)."""
+    def check(k, label):
+        v = {**(current or {}), **data}.get(k)
+        if v is not None and v > MAX_LAKHS:
+            raise HTTPException(400, f"{label} must be entered in ₹ lakhs — e.g. 35 for ₹35 lakh. {v:,.0f} looks like a rupee amount.")
+    check("ctc", "Candidate CTC")
+    m = {**(current or {}), **data}
+    if data.get("amount") is None and m.get("ctc") is not None and m.get("fee_percent") is not None:
+        data["amount"] = round(m["ctc"] * m["fee_percent"] / 100, 4)
+    check("amount", "Fee amount")
+    return data
+
+
+async def hire_ctc(candidate_ids):
+    """CTC per joined candidate: the CTC typed on that candidate's cost entries, else the offer CTC."""
+    ids = [c for c in candidate_ids if c]
+    out = {c: None for c in ids}
+    async for c in db.costs.find({"candidate_id": {"$in": ids}, "ctc": {"$ne": None}}, {"_id": 0, "candidate_id": 1, "ctc": 1}):
+        out[c["candidate_id"]] = max(out[c["candidate_id"]] or 0, c["ctc"])
+    missing = [c for c, v in out.items() if v is None]
+    if missing:
+        offers = await db.offers.find({"candidate_id": {"$in": missing}, "ctc": {"$ne": None}}, {"_id": 0}).sort("created_at", 1).to_list(5000)
+        for o in offers:  # later offers overwrite earlier ones; an accepted offer always wins
+            if out.get(o["candidate_id"]) is None or o.get("status") == "Accepted":
+                out[o["candidate_id"]] = o["ctc"]
+    return out
+
+
 def validate_cost(data, creating):
     if creating and (not data.get("category_id") or data.get("amount") is None or not data.get("invoice_date")):
         raise HTTPException(400, "Cost category, invoice date and amount are required")
@@ -362,7 +397,12 @@ def validate_cost(data, creating):
 
 @router.post("/costs")
 async def create_cost(body: CostIn, user=Depends(require("cost.manage"))):
+    from routes_recruit import resolve_named
     data = body.model_dump()
+    if data.get("partner_name") is None:
+        data.pop("partner_name", None)
+    data = await resolve_named(data, user, "partner_name", "partner_id", "partner", "cost form")
+    data = apply_fee(data)
     data["payment_status"] = data.get("payment_status") or "Pending"
     validate_cost(data, True)
     doc = data | {"id": new_id(), "code": await next_code("CST"), "created_by": user["name"], "created_at": now_iso(), "updated_at": now_iso()}
@@ -377,7 +417,9 @@ async def update_cost(cid: str, body: CostIn, user=Depends(require("cost.manage"
     c = await db.costs.find_one({"id": cid}, {"_id": 0})
     if not c:
         raise HTTPException(404, "Not found")
-    data = body.model_dump(exclude_unset=True)
+    from routes_recruit import resolve_named
+    data = await resolve_named(body.model_dump(exclude_unset=True), user, "partner_name", "partner_id", "partner", "cost form")
+    data = apply_fee(data, c)
     validate_cost({**c, **data}, False)
     data["updated_at"] = now_iso()
     await db.costs.update_one({"id": cid}, {"$set": data})

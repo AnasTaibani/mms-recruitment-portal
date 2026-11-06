@@ -1,7 +1,7 @@
 import axios from "axios";
 import { format, parseISO } from "date-fns";
 
-export const api = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL}/api`, withCredentials: true });
+export const api = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL || ""}/api`, withCredentials: true });
 
 let refreshing = null;
 api.interceptors.response.use(

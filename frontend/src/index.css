@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --background: 216 60% 98%;
+        --foreground: 222 63% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 63% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 63% 11%;
+        --primary: 216 75% 46%;            /* #1E63CE – buttons, switches, checkboxes */
+        --primary-foreground: 0 0% 100%;
+        --secondary: 214 80% 96%;
+        --secondary-foreground: 216 75% 30%;
+        --muted: 214 40% 96%;
+        --muted-foreground: 220 9% 46%;
+        --accent: 214 80% 96%;             /* hover backgrounds */
+        --accent-foreground: 216 75% 36%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 214 32% 90%;
+        --input: 214 32% 88%;
+        --ring: 216 75% 46%;               /* focus outline */
+        --radius: 0.75rem;
+    }
+}
+
+@layer base {
+    * { @apply border-border; }
+    body {
+        @apply bg-background text-foreground;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: #1E63CE; color: #fff; }
+}
+
+.font-mono, code { font-family: 'JetBrains Mono', monospace; }
+.eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-[#1E63CE]/80; }
+.fade-up { animation: fadeUp .35s ease both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 8px; }
+.recharts-wrapper text { font-family: 'Plus Jakarta Sans', sans-serif; }
+
+[data-debug-wrapper="true"] { display: contents !important; }

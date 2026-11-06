@@ -1,0 +1,201 @@
+{
+  "project_name": "MetaMorphoSys Technologies (MMS) Recruitment Management & Analysis Portal",
+  "app_type": "dashboard / enterprise_saas",
+  "theme": {
+    "mode": "light_only",
+    "description": "Light theme only with matte black accents, soft white, off-white, and light zinc backgrounds. Strictly NO blue color tones.",
+    "color_palette": {
+      "background": "#FAFAFA",
+      "surface": "#FFFFFF",
+      "surface_subtle": "#F4F4F5",
+      "border": "#E4E4E7",
+      "border_dark": "#D4D4D8",
+      "text_primary": "#09090B",
+      "text_secondary": "#52525B",
+      "text_muted": "#71717A",
+      "primary_action": "#1E63CE",
+      "primary_action_hover": "#27272A",
+      "primary_action_text": "#FFFFFF",
+      "accent_amber": "#D97706",
+      "accent_emerald": "#059669",
+      "accent_terracotta": "#C2410C",
+      "accent_plum": "#7C3AED",
+      "accent_rose": "#DC2626"
+    },
+    "forbidden_colors": [
+      "#0000FF", "#1D4ED8", "#2563EB", "#3B82F6", "#60A5FA", "#93C5FD", "#BFDBFE",
+      "#0EA5E9", "#0284C7", "#0369A1", "#06B6D4", "#0891B2", "#0E7490", "#1B93A4"
+    ]
+  },
+  "typography": {
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap",
+    "font_family_heading": "'Plus Jakarta Sans', sans-serif",
+    "font_family_body": "'Plus Jakarta Sans', sans-serif",
+    "font_family_mono": "'JetBrains Mono', monospace",
+    "hierarchy": {
+      "h1": "text-3xl font-bold tracking-tight text-zinc-900",
+      "h2": "text-2xl font-semibold tracking-tight text-zinc-900",
+      "h3": "text-xl font-semibold text-zinc-900",
+      "h4": "text-lg font-medium text-zinc-900",
+      "body": "text-sm text-zinc-600 leading-relaxed",
+      "small": "text-xs text-zinc-500",
+      "label": "text-xs font-semibold uppercase tracking-wider text-zinc-500",
+      "kpi_value": "text-3xl font-extrabold text-zinc-900 tracking-tight"
+    }
+  },
+  "status_badge_palette": {
+    "rule": "Muted, high-contrast, non-blue status pill badges with subtle border and fill.",
+    "badges": {
+      "Hired / Joined / Approved / Active / Offer Accepted": {
+        "bg": "bg-emerald-50",
+        "text": "text-emerald-800",
+        "border": "border-emerald-200",
+        "dot": "bg-emerald-500"
+      },
+      "In Review / Screening / Shortlisted / Interviewing / Pending": {
+        "bg": "bg-amber-50",
+        "text": "text-amber-800",
+        "border": "border-amber-200",
+        "dot": "bg-amber-500"
+      },
+      "Rejected / Cancelled / Declined / Expired": {
+        "bg": "bg-rose-50",
+        "text": "text-rose-800",
+        "border": "border-rose-200",
+        "dot": "bg-rose-500"
+      },
+      "Offer Sent / Salary Negotiation / Under Approval": {
+        "bg": "bg-purple-50",
+        "text": "text-purple-800",
+        "border": "border-purple-200",
+        "dot": "bg-purple-500"
+      },
+      "Draft / On Hold / Sourced / Archived": {
+        "bg": "bg-zinc-100",
+        "text": "text-zinc-700",
+        "border": "border-zinc-200",
+        "dot": "bg-zinc-400"
+      },
+      "Priority Urgent": {
+        "bg": "bg-orange-50",
+        "text": "text-orange-800",
+        "border": "border-orange-200",
+        "dot": "bg-orange-500"
+      }
+    }
+  },
+  "recharts_palette": {
+    "rule": "No blue shades in charts. Use warm corporate matte tones.",
+    "colors": [
+      "#1E63CE",
+      "#D97706",
+      "#059669",
+      "#C2410C",
+      "#7C3AED",
+      "#EAB308",
+      "#71717A"
+    ],
+    "chart_1": "#1E63CE",
+    "chart_2": "#D97706",
+    "chart_3": "#059669",
+    "chart_4": "#C2410C",
+    "chart_5": "#7C3AED"
+  },
+  "layout_architecture": {
+    "sidebar": {
+      "type": "persistent_collapsible",
+      "expanded_width": "w-64",
+      "collapsed_width": "w-16",
+      "bg": "bg-white border-r border-zinc-200",
+      "items": [
+        { "id": "dashboard", "label": "Executive Analytics", "icon": "LayoutDashboard" },
+        { "id": "requisitions", "label": "Job Requisitions", "icon": "Briefcase" },
+        { "id": "candidates", "label": "Candidate Pool", "icon": "Users" },
+        { "id": "kanban", "label": "Recruitment Pipeline", "icon": "Kanban" },
+        { "id": "interviews", "label": "Interviews & Feedback", "icon": "CalendarCheck" },
+        { "id": "offers", "label": "Offers & Joining", "icon": "FileCheck" },
+        { "id": "costs", "label": "Cost & Partners", "icon": "IndianRupee" },
+        { "id": "analytics", "label": "Deep Analytics", "icon": "BarChart3" },
+        { "id": "import", "label": "Excel Import Wizard", "icon": "FileSpreadsheet" },
+        { "id": "settings", "label": "Master Data & Roles", "icon": "Settings" }
+      ]
+    },
+    "header": {
+      "height": "h-16",
+      "bg": "bg-white/80 backdrop-blur-md border-b border-zinc-200 sticky top-0 z-30",
+      "elements": [
+        "Sidebar Toggle",
+        "Page Title & Breadcrumbs",
+        "Global Search Input",
+        "Role Switcher (Super Admin, HR Admin, Recruiter, Hiring Manager, Interviewer, Management)",
+        "Notifications Popover",
+        "User Profile Avatar Menu"
+      ]
+    },
+    "container": "max-w-7xl mx-auto p-6 space-y-6"
+  },
+  "key_modules": {
+    "auth_roles": {
+      "description": "Role-Based Access Control switcher in header with simulation mode to view portal from 6 distinct persona perspectives."
+    },
+    "requisitions": {
+      "description": "Job posting and approval workflow tracking headcount, budget in ₹ Lakhs, department, priority, target dates, and status."
+    },
+    "candidate_pool": {
+      "description": "Searchable candidate repository with filtering by experience, tech skills, location, notice period, and status."
+    },
+    "excel_import_wizard": {
+      "steps": [
+        "1. Upload Candidate Excel / CSV File",
+        "2. Column Mapping (Name, Email, Phone, Role, Exp, CTC, Skills)",
+        "3. Data Validation & Conflict Resolution",
+        "4. Import Summary & Success Logs"
+      ]
+    },
+    "kanban_pipeline": {
+      "stages": [
+        "Sourced",
+        "Screening",
+        "Technical Round 1",
+        "Technical Round 2",
+        "HR / Culture Fit",
+        "Offer Extended",
+        "Joined / Hired"
+      ]
+    },
+    "dynamic_interviews_feedback": {
+      "description": "Schedule panel, 5-star criteria ratings (Technical, Problem Solving, Communication, Culture), recommendation status, and notes."
+    },
+    "offers_joining": {
+      "description": "Offer letter creation, CTC breakdown in ₹ Lakhs, joining date tracking, document verification, and drop-out reasons."
+    },
+    "cost_and_analytics": {
+      "currency": "INR in Lakhs (₹ in L)",
+      "kpis": ["Cost Per Hire", "Time to Hire (Days)", "Offer Acceptance Rate (%)", "Agency vs Direct Sourcing Ratio", "Funnel Conversion Rate (%)"],
+      "charts": ["Funnel conversion stage chart", "Cost per hire by department", "Recruiter performance matrix", "Source ROI bar chart", "Cycle time trend"]
+    },
+    "master_data_settings": {
+      "editors": ["Department Master", "Designation Master", "Interview Evaluation Criteria Templates", "Recruitment Agencies & Fee Specs", "Role Permissions"]
+    }
+  },
+  "testing_requirements": {
+    "rule": "All key components, buttons, tabs, tables, inputs, filters, badges, and modal triggers MUST have explicit data-testid attributes.",
+    "naming_convention": "kebab-case describing function",
+    "examples": [
+      "data-testid='role-switcher'",
+      "data-testid='requisition-table'",
+      "data-testid='btn-add-candidate'",
+      "data-testid='kanban-stage-technical-1'",
+      "data-testid='import-step-upload'",
+      "data-testid='feedback-submit-btn'",
+      "data-testid='kpi-cost-per-hire'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure ALL views are implemented with clean JavaScript (.js / .jsx) components.",
+    "Do NOT use any blue colors in text, buttons, borders, backgrounds, badges, or Recharts.",
+    "Include full interactivity: filtering, searching, modal dialogs, tab switching, Excel import steps, role switching, notification toasts, and dynamic charts.",
+    "Ensure proper spacing (p-6, gap-6, space-y-6) with clean 1px zinc borders and soft white card surfaces.",
+    "Format all monetary figures in Indian Rupees in Lakhs (e.g. ₹14.5 L, ₹2.8 L)."
+  ]
+}

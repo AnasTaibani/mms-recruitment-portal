@@ -17,7 +17,7 @@ export function ReqForm({ open, onOpenChange, initial, onSaved }) {
   const { meta } = useAuth();
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} wide title={initial?.id ? `Edit ${initial.code}` : "New requisition"} testid="req-form"
-      fields={reqFields(meta)} initial={initial ? { ...initial, skills: (initial.skills || []).join(", ") } : null}
+      fields={reqFields(meta)} initial={initial ? { ...initial, skills: (initial.skills || []).join(", "), department_name: initial.department || "", hiring_manager_name: initial.hiring_manager || "", location_name: initial.location || "" } : null}
       onSubmit={async (v) => {
         try {
           const body = { ...v, skills: toSkills(v.skills) };

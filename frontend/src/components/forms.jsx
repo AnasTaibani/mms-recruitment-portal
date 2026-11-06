@@ -15,14 +15,14 @@ const opts = (arr) => arr.map((s) => ({ value: s, label: s }));
 
 export const reqFields = (meta) => [
   { name: "title", label: "Job Title / Role", required: true, suggest: "job_title" },
-  { name: "department_id", label: "Department / Business Function", master: "department" },
-  { name: "hiring_manager_id", label: "Hiring Manager", master: "hiring_manager" },
+  { name: "department_name", label: "Department / Business Function", suggest: "department", placeholder: "Type the department" },
+  { name: "hiring_manager_name", label: "Hiring Manager", suggest: "hiring_manager", placeholder: "Type the hiring manager's name" },
   { name: "recruiter_id", label: "Assigned Recruiter", master: "recruiter" },
   { name: "positions", label: "Number of Open Positions", type: "number", required: true, min: 1 },
   { name: "experience", label: "Required Experience", placeholder: "e.g. 4-6 years" },
   { name: "min_ctc", label: "Minimum CTC (₹ L)", type: "number" },
   { name: "max_ctc", label: "Maximum CTC (₹ L)", type: "number" },
-  { name: "location_id", label: "Preferred Location", master: "location" },
+  { name: "location_name", label: "Preferred Location", type: "select", options: opts(["Mumbai", "Pune"]) },
   { name: "employment_type_id", label: "Employment Type", master: "employment_type" },
   { name: "priority_id", label: "Priority", master: "priority" },
   { name: "status", label: "Status", type: "select", options: opts(meta.req_statuses), default: "Open" },

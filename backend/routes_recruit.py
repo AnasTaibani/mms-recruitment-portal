@@ -36,6 +36,10 @@ class ReqIn(BaseModel):
     status: Optional[str] = None
     remarks: Optional[str] = None
     closure_reason: Optional[str] = None
+    # free-text names from the form, resolved to the *_id fields above
+    department_name: Optional[str] = None
+    hiring_manager_name: Optional[str] = None
+    location_name: Optional[str] = None
 
 
 REQ_LABELS = {"title": "Job title", "department_id": "Department", "hiring_manager_id": "Hiring manager",
@@ -98,7 +102,7 @@ async def validate_req(data):
 
 @router.post("/requisitions")
 async def create_requisition(body: ReqIn, user=Depends(require("req.manage"))):
-    data = body.model_dump()
+    data = await resolve_req_names(body.model_dump(), user, create=True)
     await validate_req(data)
     if not (data.get("title") or "").strip() or not data.get("positions"):
         raise HTTPException(400, "Job title and number of positions are required")
@@ -143,7 +147,7 @@ async def get_requisition(rid: str, user=Depends(require("req.view"))):
 @router.put("/requisitions/{rid}")
 async def update_requisition(rid: str, body: ReqIn, user=Depends(require("req.manage"))):
     req = await get_visible("requisitions", "req", rid, await get_scope(user))
-    data = body.model_dump(exclude_unset=True)
+    data = await resolve_req_names(body.model_dump(exclude_unset=True), user)
     await validate_req(data)
     if data.get("status") == "Closed" and req["status"] != "Closed":
         issues = await closure_issues(req, data)
@@ -292,21 +296,38 @@ async def create_application(user, cand, req, note="", status="New"):
     return app
 
 
-async def resolve_partner(data, user):
-    """Turn the free-text consultancy name into partner_id so partner reports and costs keep working."""
-    if "partner_name" not in data:
+async def resolve_named(data, user, name_field, id_field, mtype, source):
+    """Free-text name -> master id. Matches Master Data case-insensitively, adds the name if it is new,
+    so filters and analytics that group by the master id keep working."""
+    if name_field not in data:
         return data
-    name = re.sub(r"\s+", " ", (data.pop("partner_name") or "")).strip()
+    name = re.sub(r"\s+", " ", (data.pop(name_field) or "")).strip()
     if not name:
-        data["partner_id"] = None
+        data[id_field] = None
         return data
-    m = await db.masters.find_one({"type": "partner", "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0, "id": 1})
+    m = await db.masters.find_one({"type": mtype, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0, "id": 1})
     if not m:
-        m = {"id": new_id(), "type": "partner", "name": name, "active": True, "user_id": None,
-             "notes": "Added from candidate form", "created_at": now_iso()}
+        m = {"id": new_id(), "type": mtype, "name": name, "active": True, "user_id": None,
+             "notes": f"Added from {source}", "created_at": now_iso()}
         await db.masters.insert_one(dict(m))
-        await log_activity(user, "master_create", "master", m["id"], name, "Recruitment partner (from candidate form)")
-    data["partner_id"] = m["id"]
+        await log_activity(user, "master_create", "master", m["id"], name, f"{mtype} (from {source})")
+    data[id_field] = m["id"]
+    return data
+
+
+async def resolve_partner(data, user):
+    return await resolve_named(data, user, "partner_name", "partner_id", "partner", "candidate form")
+
+
+REQ_NAMED = [("department_name", "department_id", "department"), ("hiring_manager_name", "hiring_manager_id", "hiring_manager"),
+             ("location_name", "location_id", "location")]
+
+
+async def resolve_req_names(data, user, create=False):
+    for name_field, id_field, mtype in REQ_NAMED:
+        if create and data.get(name_field) is None:
+            data.pop(name_field, None)
+        data = await resolve_named(data, user, name_field, id_field, mtype, "requisition form")
     return data
 
 

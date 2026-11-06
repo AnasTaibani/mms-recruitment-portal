@@ -34,6 +34,9 @@ export function AuthProvider({ children }) {
     tokens.clear();
     setUser(false);
   };
+  const can = (p) => !!user && user.permissions?.includes(p);
+  const list = (type, all = false) => masters.filter((m) => m.type === type && (all || m.active));
+  const mname = (id) => masters.find((m) => m.id === id)?.name;
 
   return (
     <AuthCtx.Provider value={{ user, setUser, login, logout, can, meta, masters, list, mname, reloadRef: loadRef }}>

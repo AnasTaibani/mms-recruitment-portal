@@ -10,7 +10,7 @@ import { FormDialog } from "@/components/common/FormDialog";
 import { api, errMsg, fmtDateTime } from "@/lib/api";
 import { toast } from "sonner";
 
-const DESC = { super_admin: "Full system access", hr_admin: "All recruitment operations & masters", recruiter: "Assigned requisitions & candidates", hiring_manager: "Own requisitions, shortlist & decide", interviewer: "Assigned interviews & feedback only", management: "Read-only dashboards & reports" };
+const DESC = { super_admin: "Full system access", recruiter: "All recruitment operations & masters", interviewer: "Assigned interviews & feedback only", management: "Read-only dashboards & reports" };
 
 export default function UsersPage() {
   const { meta, can, user: me, reloadRef } = useAuth();
@@ -33,7 +33,7 @@ export default function UsersPage() {
   ];
   return (
     <div>
-      <PageHeader eyebrow="Administration" title="Users & Roles" description="Create accounts, assign roles and activate or deactivate access. Recruiters, hiring managers and interviewers are linked to their master-data entry automatically."
+      <PageHeader eyebrow="Administration" title="Users & Roles" description="Create accounts, assign roles and activate or deactivate access. Recruiters and interviewers are linked to their master-data entry automatically."
         actions={<Button onClick={() => setDlg({ kind: "new" })} data-testid="user-new-btn"><Plus className="mr-2 h-4 w-4" />New user</Button>} />
       <DataTable testid="users-table" columns={cols} data={data} loading={loading} />
       <FormDialog open={dlg?.kind === "new"} onOpenChange={(o) => !o && setDlg(null)} title="Create user" testid="user-form" description="The user must change this temporary password after first sign-in."

@@ -188,6 +188,7 @@ class CandIn(BaseModel):
     available_from: Optional[str] = None
     source_id: Optional[str] = None
     partner_id: Optional[str] = None
+    partner_name: Optional[str] = None  # free text; matched to (or added to) Master Data → Recruitment Partners
     recruiter_id: Optional[str] = None
     remarks: Optional[str] = None
     skills: Optional[List[str]] = None
@@ -291,6 +292,24 @@ async def create_application(user, cand, req, note="", status="New"):
     return app
 
 
+async def resolve_partner(data, user):
+    """Turn the free-text consultancy name into partner_id so partner reports and costs keep working."""
+    if "partner_name" not in data:
+        return data
+    name = re.sub(r"\s+", " ", (data.pop("partner_name") or "")).strip()
+    if not name:
+        data["partner_id"] = None
+        return data
+    m = await db.masters.find_one({"type": "partner", "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0, "id": 1})
+    if not m:
+        m = {"id": new_id(), "type": "partner", "name": name, "active": True, "user_id": None,
+             "notes": "Added from candidate form", "created_at": now_iso()}
+        await db.masters.insert_one(dict(m))
+        await log_activity(user, "master_create", "master", m["id"], name, "Recruitment partner (from candidate form)")
+    data["partner_id"] = m["id"]
+    return data
+
+
 def cand_fields(data):
     if data.get("email"):
         data["email"] = data["email"].strip().lower()
@@ -307,6 +326,8 @@ def cand_fields(data):
 async def create_candidate(body: CandIn, user=Depends(require("cand.manage"))):
     data = body.model_dump()
     force, req_id = data.pop("force"), data.pop("requisition_id")
+    if data.get("partner_name") is None:
+        data.pop("partner_name", None)
     if not (data.get("name") or "").strip():
         raise HTTPException(400, "Full name is required")
     if not data.get("email") and not data.get("phone"):
@@ -317,6 +338,7 @@ async def create_candidate(body: CandIn, user=Depends(require("cand.manage"))):
     if user["role"] == "recruiter" and not data.get("recruiter_id"):
         mine = await person_ids(user, "recruiter")
         data["recruiter_id"] = mine[0] if mine else None
+    data = await resolve_partner(data, user)
     ts = now_iso()
     doc = cand_fields(data) | {"id": new_id(), "code": await next_code("CAN", 5), "name": data["name"].strip(),
                                "skills": data.get("skills") or [], "created_by": user["id"], "created_at": ts, "updated_at": ts}
@@ -353,7 +375,7 @@ async def update_candidate(cid: str, body: CandIn, user=Depends(require("cand.ma
     dups = await find_duplicates(data.get("email"), data.get("phone"), cid) if ("email" in data or "phone" in data) else []
     if dups and not force:
         raise HTTPException(409, {"message": "Another candidate has this email or mobile number", "duplicates": dups})
-    data = cand_fields(data)
+    data = cand_fields(await resolve_partner(data, user))
     data["updated_at"] = now_iso()
     await db.candidates.update_one({"id": cid}, {"$set": data})
     changed = [k for k, v in data.items() if c.get(k) != v and k not in ("updated_at", "phone_norm", "notice_days")]

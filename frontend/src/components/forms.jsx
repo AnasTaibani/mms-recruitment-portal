@@ -50,7 +50,7 @@ export const candFields = () => [
   { name: "last_working_day", label: "Last Working Day", type: "date" },
   { name: "available_from", label: "Available From", type: "date" },
   { name: "source_id", label: "Candidate Source", master: "source" },
-  { name: "partner_id", label: "Recruitment Partner / Consultancy", master: "partner" },
+  { name: "partner_name", label: "Recruitment Partner / Consultancy", suggest: "partner", placeholder: "Type the consultancy name" },
   { name: "recruiter_id", label: "Assigned Recruiter", master: "recruiter" },
   { name: "remarks", label: "Remarks", type: "textarea" },
 ];
@@ -77,7 +77,7 @@ export function CandidateDialog({ open, onOpenChange, initial, onSaved, extraFie
   };
   return (
     <FormDialog open={open} onOpenChange={(o) => { setDups(null); onOpenChange(o); }} title={initial?.id ? "Edit candidate" : "Add candidate"} wide
-      fields={[...candFields(), ...extraFields]} initial={initial} onSubmit={(v) => save(v)} testid="candidate-form">
+      fields={[...candFields(), ...extraFields]} initial={initial ? { ...initial, partner_name: initial.partner || "" } : initial} onSubmit={(v) => save(v)} testid="candidate-form">
       {dups && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="duplicate-warning">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Potential duplicate candidate</p>
@@ -140,7 +140,7 @@ export function FeedbackDialog({ open, onOpenChange, interview, onDone }) {
   const [text, setText] = useState({ detailed: "", strengths: "", improvements: "" });
   const [ivr, setIvr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const admin = ["super_admin", "hr_admin"].includes(user.role);
+  const admin = ["super_admin", "recruiter"].includes(user.role);
   const ready = RATINGS.every(([k]) => r[k]) && rec && text.detailed.trim() && (!admin || ivr || interview?.my_pending?.length);
   const submit = async () => {
     setBusy(true);

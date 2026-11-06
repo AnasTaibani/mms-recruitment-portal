@@ -1,7 +1,9 @@
 import axios from "axios";
 import { format, parseISO } from "date-fns";
 
-export const api = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL || ""}/api`, withCredentials: true });
+// Always call the API on the same site: Vercel forwards /api to Render (see vercel.json),
+// and locally the "proxy" in package.json forwards it to the backend on port 8001.
+export const api = axios.create({ baseURL: "/api", withCredentials: true });
 
 // Login tokens are kept here as well as in cookies, and sent as headers, so sign-in
 // keeps working when the browser blocks the cookies (e.g. API on another domain).

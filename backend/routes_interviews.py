@@ -236,7 +236,7 @@ class FeedbackIn(BaseModel):
 async def submit_feedback(iid: str, body: FeedbackIn, user=Depends(require("feedback.submit"))):
     iv = await get_visible("interviews", "interview", iid, await get_scope(user))
     mine = set(await person_ids(user, "interviewer")) & set(iv["interviewer_ids"])
-    if body.interviewer_id and user["role"] in ("super_admin", "hr_admin"):
+    if body.interviewer_id and user["role"] in ("super_admin", "recruiter"):
         if body.interviewer_id not in iv["interviewer_ids"]:
             raise HTTPException(400, "Interviewer is not assigned to this interview")
         ivr = body.interviewer_id

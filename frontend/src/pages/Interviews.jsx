@@ -23,7 +23,7 @@ function Detail({ id, onClose, onChanged }) {
   const refresh = () => { reload(); onChanged(); };
   const status = async (body, msg) => { try { await api.post(`/interviews/${id}/status`, body); toast.success(msg); refresh(); } catch (e) { toast.error(errMsg(e)); throw e; } };
   const open = iv && ["Scheduled", "Rescheduled"].includes(iv.status);
-  const canFb = iv && can("feedback.submit") && !["Cancelled", "No Show"].includes(iv.status) && (iv.my_pending.length || ["super_admin", "hr_admin"].includes(user.role) || iv.feedback.some((f) => iv.interviewer_ids.includes(f.interviewer_id)));
+  const canFb = iv && can("feedback.submit") && !["Cancelled", "No Show"].includes(iv.status) && (iv.my_pending.length || ["super_admin", "recruiter"].includes(user.role) || iv.feedback.some((f) => iv.interviewer_ids.includes(f.interviewer_id)));
   return (
     <Sheet open={!!id} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="interview-detail">

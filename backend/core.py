@@ -25,9 +25,11 @@ OFFER_STATUSES = ["Draft", "Approval Pending", "Approved", "Released", "Accepted
 JOINING_STATUSES = ["Pending", "Joining Confirmed", "Joined", "Joining Deferred", "No Show", "Cancelled"]
 RECOMMENDATIONS = ["Strong Hire", "Hire", "Hold", "Reject"]
 PAYMENT_STATUSES = ["Pending", "Partially Paid", "Paid"]
-ROLES = {"super_admin": "Super Admin", "hr_admin": "HR Admin", "recruiter": "Recruiter",
-         "hiring_manager": "Hiring Manager", "interviewer": "Interviewer", "management": "Management"}
-ROLE_PERSON = {"recruiter": "recruiter", "hiring_manager": "hiring_manager", "interviewer": "interviewer"}
+# Four personas. Recruiter = the former HR Admin + Recruiter combined (all recruitment operations & masters).
+ROLES = {"super_admin": "Super Admin", "recruiter": "Recruiter", "management": "Management", "interviewer": "Interviewer"}
+# Retired roles and what existing accounts are moved to on startup (never to a role with more access).
+LEGACY_ROLES = {"hr_admin": "recruiter", "hiring_manager": "management"}
+ROLE_PERSON = {"recruiter": "recruiter", "interviewer": "interviewer"}
 
 ALL_PERMS = {"users.manage", "users.super", "masters.manage", "settings.manage", "req.view", "req.manage",
              "cand.view", "cand.manage", "app.view", "app.create", "app.move", "app.decide", "interview.view",
@@ -36,17 +38,12 @@ ALL_PERMS = {"users.manage", "users.super", "masters.manage", "settings.manage",
              "reports.export", "import.run", "activity.view"}
 PERMS = {
     "super_admin": ALL_PERMS,
-    "hr_admin": ALL_PERMS - {"users.super"},
-    "recruiter": {"req.view", "cand.view", "cand.manage", "app.view", "app.create", "app.move", "interview.view",
-                  "interview.manage", "feedback.view", "offer.view", "offer.manage", "joining.view", "joining.manage",
-                  "analytics.view", "reports.export"},
-    "hiring_manager": {"req.view", "cand.view", "app.view", "app.decide", "interview.view", "feedback.view",
-                       "selection.decide", "offer.view", "joining.view", "analytics.view", "reports.export"},
+    "recruiter": ALL_PERMS - {"users.super"},
     "interviewer": {"req.view", "cand.view", "interview.view", "feedback.submit"},
     "management": {"req.view", "cand.view", "app.view", "interview.view", "feedback.view", "offer.view",
                    "joining.view", "cost.view", "analytics.view", "reports.export", "activity.view"},
 }
-FULL_SCOPE = {"super_admin", "hr_admin", "management"}
+FULL_SCOPE = {"super_admin", "recruiter", "management"}
 HM_ALLOWED = {"Shortlisted", "CV Rejected", "On Hold", "Interview Rejected", "Selected"}
 
 
@@ -184,18 +181,7 @@ async def get_scope(user):
                                                     {"application_id": 1, "candidate_id": 1, "requisition_id": 1})]
         return Scope(False, {i["requisition_id"] for i in ivs}, {i["application_id"] for i in ivs},
                      {i["candidate_id"] for i in ivs}, iids)
-    ptype = "recruiter" if role == "recruiter" else "hiring_manager"
-    pids = await person_ids(user, ptype)
-    field = "recruiter_id" if role == "recruiter" else "hiring_manager_id"
-    reqs = await _ids("requisitions", {field: {"$in": pids}})
-    aq = {"$or": [{"requisition_id": {"$in": list(reqs)}}]}
-    if role == "recruiter":
-        aq["$or"].append({"recruiter_id": {"$in": pids}})
-    apps = [d async for d in db.applications.find(aq, {"id": 1, "candidate_id": 1})]
-    cands = {a["candidate_id"] for a in apps}
-    if role == "recruiter":
-        cands |= await _ids("candidates", {"$or": [{"recruiter_id": {"$in": pids}}, {"created_by": user["id"]}]})
-    return Scope(False, reqs, {a["id"] for a in apps}, cands)
+    return Scope(False, set(), set(), set())  # unknown / retired role: sees nothing
 
 
 async def get_visible(coll, kind, rid, scope):
@@ -217,7 +203,7 @@ async def user_ids_for_person(pid):
 
 
 async def admin_user_ids():
-    return [u["id"] async for u in db.users.find({"role": {"$in": ["super_admin", "hr_admin"]}, "active": True}, {"id": 1})]
+    return [u["id"] async for u in db.users.find({"role": {"$in": ["super_admin", "recruiter"]}, "active": True}, {"id": 1})]
 
 
 async def log_activity(user, action, entity, entity_id, label="", details=""):

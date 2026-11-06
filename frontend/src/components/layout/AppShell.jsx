@@ -61,15 +61,13 @@ function SideNav({ collapsed, onNavigate }) {
 
 function Brand({ collapsed }) {
   return (
-    <Link to="/" className="flex h-16 items-center gap-2.5 border-b border-zinc-200 px-4">
+    <Link to="/" className="flex h-20 items-center border-b border-zinc-200 px-4">
       {collapsed ? (
-        <div className="h-9 w-9 overflow-hidden">
-          <img src="/mms-logo.png" alt="MetaMorphoSys Technologies" className="h-9 w-auto max-w-none object-cover object-left" />
-        </div>
+        <img src="/mms-mark.png" alt="MetaMorphoSys Technologies" className="mx-auto h-9 w-9 object-contain" />
       ) : (
-        <div className="leading-tight">
-          <img src="/mms-logo.png" alt="MetaMorphoSys Technologies" className="h-9 w-auto" />
-          <p className="mt-0.5 pl-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Talent Portal</p>
+        <div className="w-full leading-tight">
+          <img src="/mms-logo.png" alt="MetaMorphoSys Technologies" className="h-11 w-auto max-w-full object-contain" />
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Talent Portal</p>
         </div>
       )}
     </Link>
@@ -142,7 +140,7 @@ export default function AppShell() {
         <SheetContent side="left" className="flex w-72 flex-col p-0"><Brand /><SideNav onNavigate={() => setMobile(false)} /></SheetContent>
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-zinc-200 bg-white/85 px-4 backdrop-blur-md sm:px-6">
+        <header className="sticky top-0 z-30 flex h-20 items-center gap-3 border-b border-zinc-200 bg-white/85 px-4 backdrop-blur-md sm:px-6">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobile(true)} data-testid="mobile-menu-btn"><Menu className="h-5 w-5" /></Button>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-zinc-900" data-testid="topbar-title">{parts[1].label}</p>

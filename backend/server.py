@@ -66,7 +66,20 @@ def default_transitions():
     return t
 
 
+async def migrate_roles():
+    """Move accounts on retired roles (HR Admin, Hiring Manager) to the four current personas."""
+    from core import LEGACY_ROLES
+    for old, new in LEGACY_ROLES.items():
+        users = [u async for u in db.users.find({"role": old}, {"_id": 0})]
+        for u in users:
+            await db.users.update_one({"id": u["id"]}, {"$set": {"role": new, "previous_role": old}})
+            await routes_admin.sync_person(u | {"role": new})
+        if users:
+            logger.info("roles: moved %d %s account(s) to %s", len(users), old, new)
+
+
 async def seed():
+    await migrate_roles()
     for coll, models in INDEXES.items():
         for m in models:
             try:

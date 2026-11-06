@@ -86,7 +86,7 @@ function AgePerHirePanel() {
 export default function Dashboard() {
   const { user, can } = useAuth();
   const { data, loading } = useFetch("/analytics", {}, can("analytics.view"));
-  const scopeNote = { recruiter: "Showing requisitions and candidates assigned to you.", hiring_manager: "Showing your requisitions.", management: "Organisation-wide, read-only." }[user.role];
+  const scopeNote = { management: "Organisation-wide, read-only." }[user.role];
   return (
     <div>
       <PageHeader eyebrow={`${user.role_label} workspace`} title={`Welcome, ${user.name.split(" ")[0]}`} description={scopeNote || "Live recruitment overview from portal records."} />

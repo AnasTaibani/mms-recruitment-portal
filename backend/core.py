@@ -36,12 +36,14 @@ ALL_PERMS = {"users.manage", "users.super", "masters.manage", "settings.manage",
              "interview.manage", "feedback.submit", "feedback.view", "selection.decide", "offer.view", "offer.manage",
              "offer.approve", "joining.view", "joining.manage", "cost.view", "cost.manage", "analytics.view",
              "reports.export", "import.run", "activity.view"}
+# Activity Log, Users & Roles, and Master Data & Settings are for the Super Admin only.
+SUPER_ONLY = {"users.super", "users.manage", "masters.manage", "settings.manage", "activity.view"}
 PERMS = {
     "super_admin": ALL_PERMS,
-    "recruiter": ALL_PERMS - {"users.super"},
+    "recruiter": ALL_PERMS - SUPER_ONLY,
     "interviewer": {"req.view", "cand.view", "interview.view", "feedback.submit"},
     "management": {"req.view", "cand.view", "app.view", "interview.view", "feedback.view", "offer.view",
-                   "joining.view", "cost.view", "analytics.view", "reports.export", "activity.view"},
+                   "joining.view", "cost.view", "analytics.view", "reports.export"},
 }
 FULL_SCOPE = {"super_admin", "recruiter", "management"}
 HM_ALLOWED = {"Shortlisted", "CV Rejected", "On Hold", "Interview Rejected", "Selected"}

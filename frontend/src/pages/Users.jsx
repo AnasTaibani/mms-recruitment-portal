@@ -10,7 +10,7 @@ import { FormDialog } from "@/components/common/FormDialog";
 import { api, errMsg, fmtDateTime } from "@/lib/api";
 import { toast } from "sonner";
 
-const DESC = { super_admin: "Full system access", recruiter: "All recruitment operations & masters", interviewer: "Assigned interviews & feedback only", management: "Read-only dashboards & reports" };
+const DESC = { super_admin: "Full system access", recruiter: "All recruitment operations", interviewer: "Assigned interviews & feedback only", management: "Read-only dashboards & reports" };
 
 export default function UsersPage() {
   const { meta, can, user: me, reloadRef } = useAuth();

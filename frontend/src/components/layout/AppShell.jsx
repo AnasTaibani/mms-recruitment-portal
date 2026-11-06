@@ -67,7 +67,7 @@ function Brand({ collapsed }) {
       ) : (
         <div className="w-full leading-tight">
           <img src="/mms-logo.png" alt="MetaMorphoSys Technologies" className="h-11 w-auto max-w-full object-contain" />
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Talent Portal</p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Recruitment Portal</p>
         </div>
       )}
     </Link>

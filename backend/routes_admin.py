@@ -27,8 +27,11 @@ MASTER_TYPES = {"department": "Departments", "job_title": "Job Titles / Roles", 
 
 def set_cookies(resp, uid):
     opts = dict(httponly=True, secure=True, samesite="none", path="/")
-    resp.set_cookie("access_token", make_token(uid, "access", timedelta(hours=1)), max_age=3600, **opts)
-    resp.set_cookie("refresh_token", make_token(uid, "refresh", timedelta(days=7)), max_age=604800, **opts)
+    access, refresh = make_token(uid, "access", timedelta(hours=1)), make_token(uid, "refresh", timedelta(days=7))
+    resp.set_cookie("access_token", access, max_age=3600, **opts)
+    resp.set_cookie("refresh_token", refresh, max_age=604800, **opts)
+    # also returned in the body so the frontend can send them as headers when the browser blocks cookies
+    return {"access_token": access, "refresh_token": refresh}
 
 
 class LoginIn(BaseModel):
@@ -52,9 +55,9 @@ async def login(body: LoginIn, request: Request, response: Response):
         raise HTTPException(403, "Your account is deactivated. Contact your administrator.")
     await db.login_attempts.delete_many({"identifier": ident})
     await db.users.update_one({"id": user["id"]}, {"$set": {"last_login": now_iso()}})
-    set_cookies(response, user["id"])
+    tokens = set_cookies(response, user["id"])
     await log_activity(user, "login", "user", user["id"], user["email"])
-    return public_user(user)
+    return public_user(user) | tokens
 
 
 @router.post("/auth/logout")
@@ -66,7 +69,7 @@ async def logout(response: Response):
 
 @router.post("/auth/refresh")
 async def refresh(request: Request, response: Response):
-    token = request.cookies.get("refresh_token")
+    token = request.cookies.get("refresh_token") or request.headers.get("X-Refresh-Token")
     if not token:
         raise HTTPException(401, "No session")
     try:
@@ -76,8 +79,7 @@ async def refresh(request: Request, response: Response):
     user = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0})
     if payload.get("type") != "refresh" or not user or not user.get("active"):
         raise HTTPException(401, "Session expired")
-    set_cookies(response, user["id"])
-    return public_user(user)
+    return public_user(user) | set_cookies(response, user["id"])
 
 
 @router.get("/auth/me")

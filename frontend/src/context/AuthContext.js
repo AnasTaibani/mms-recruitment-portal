@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, tokens } from "@/lib/api";
 
 const AuthCtx = createContext(null);
 
@@ -23,17 +23,17 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const r = await api.post("/auth/login", { email, password });
-    setUser(r.data);
+    tokens.set(r.data);
+    const { access_token, refresh_token, ...u } = r.data;
+    setUser(u);
     await loadRef();
-    return r.data;
+    return u;
   };
   const logout = async () => {
     await api.post("/auth/logout").catch(() => {});
+    tokens.clear();
     setUser(false);
   };
-  const can = (p) => !!user && user.permissions?.includes(p);
-  const list = (type, all = false) => masters.filter((m) => m.type === type && (all || m.active));
-  const mname = (id) => masters.find((m) => m.id === id)?.name;
 
   return (
     <AuthCtx.Provider value={{ user, setUser, login, logout, can, meta, masters, list, mname, reloadRef: loadRef }}>

@@ -3,6 +3,21 @@ import { format, parseISO } from "date-fns";
 
 export const api = axios.create({ baseURL: `${process.env.REACT_APP_BACKEND_URL || ""}/api`, withCredentials: true });
 
+// Login tokens are kept here as well as in cookies, and sent as headers, so sign-in
+// keeps working when the browser blocks the cookies (e.g. API on another domain).
+const TOKEN_KEY = "mms_tokens";
+export const tokens = {
+  get() { try { return JSON.parse(localStorage.getItem(TOKEN_KEY)) || {}; } catch { return {}; } },
+  set(d) { try { if (d?.access_token) localStorage.setItem(TOKEN_KEY, JSON.stringify({ access_token: d.access_token, refresh_token: d.refresh_token })); } catch { /* storage unavailable */ } },
+  clear() { try { localStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ } },
+};
+api.interceptors.request.use((cfg) => {
+  const t = tokens.get();
+  if (t.access_token) cfg.headers.Authorization = `Bearer ${t.access_token}`;
+  if (t.refresh_token && cfg.url === "/auth/refresh") cfg.headers["X-Refresh-Token"] = t.refresh_token;
+  return cfg;
+});
+
 let refreshing = null;
 api.interceptors.response.use(
   (r) => r,
@@ -13,11 +28,13 @@ api.interceptors.response.use(
       cfg._retry = true;
       try {
         refreshing = refreshing || api.post("/auth/refresh");
-        await refreshing;
+        const res = await refreshing;
+        tokens.set(res.data);
         refreshing = null;
         return api(cfg);
       } catch (e) {
         refreshing = null;
+        tokens.clear();
         window.dispatchEvent(new Event("mms:logout"));
       }
     }

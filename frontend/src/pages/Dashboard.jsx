@@ -86,11 +86,21 @@ function AgePerHirePanel() {
 export default function Dashboard() {
   const { user, can } = useAuth();
   const { data, loading } = useFetch("/analytics", {}, can("analytics.view"));
-  const scopeNote = { management: "Organisation-wide, read-only." }[user.role];
+  const scopeNote = { management: "Organisation-wide, read-only — plus the interviews you are assigned to." }[user.role];
+  // users who hold Management and Interviewer roles switch between the two views here
+  const dual = can("analytics.view") && user.role === "management" && (user.roles || []).includes("interviewer");
+  const [view, setView] = useState("overview");
   return (
     <div>
       <PageHeader eyebrow={`${user.role_label} workspace`} title={`Welcome, ${user.name.split(" ")[0]}`} description={scopeNote || "Live recruitment overview from portal records."} />
-      {!can("analytics.view") ? <InterviewerHome /> : loading || !data ? <p className="text-sm text-zinc-400">Loading dashboard…</p> : (
+      {dual && (
+        <div className="mb-4 inline-flex rounded-xl border border-zinc-200 bg-white p-1" role="tablist" data-testid="dashboard-view-switch">
+          {[["overview", "Management overview"], ["interviews", "My interviews"]].map(([k, l]) => (
+            <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)} data-testid={`dashboard-view-${k}`}
+              className={`rounded-lg px-3 py-1.5 text-sm ${view === k ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-50"}`}>{l}</button>))}
+        </div>
+      )}
+      {dual && view === "interviews" ? <InterviewerHome /> : !can("analytics.view") ? <InterviewerHome /> : loading || !data ? <p className="text-sm text-zinc-400">Loading dashboard…</p> : (
         <div className="space-y-6">
           <KpiGrid k={data.kpis} cost={can("cost.view") ? data.cost : undefined} />
           <AgePerHirePanel />

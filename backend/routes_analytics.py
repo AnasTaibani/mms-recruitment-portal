@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
-from core import (db, get_user, require, can, today, days_between, effective_start, log_activity, PIPELINE,
+from core import (db, get_user, require, can, today, days_between, effective_start, log_activity, get_scope, PIPELINE,
                   IMPLIED_STAGE, INACTIVE)
 from routes_recruit import list_applications, list_requisitions, list_candidates
 from routes_interviews import list_interviews
@@ -169,9 +169,10 @@ async def compute(user, f):
     if f.get("role_exact"):
         reqs = [r for r in reqs if f["role_exact"].strip().lower() == (r.get("title") or "").strip().lower()]
     open_reqs = [r for r in reqs if r["status"] == "Open"]
-    ivs = await list_interviews(user, {k: f.get(k) for k in ("requisition_id",)})
     app_ids = {a["id"] for a in apps}
-    ivs = [i for i in ivs if i["application_id"] in app_ids]
+    # counts only (status / date) for the applications in view — Management keeps organisation-wide figures
+    # even though it can open only the interviews it is assigned to
+    ivs = [i async for i in db.interviews.find({"application_id": {"$in": list(app_ids)}}, {"_id": 0, "application_id": 1, "status": 1, "date": 1})]
 
     def count(cond, rows=apps):
         return sum(1 for a in rows if cond(a))
@@ -398,7 +399,8 @@ async def summary_rows(user, f, mode):
     for h in data["cycle"]["hires"]:
         if h["joined_on"]:
             p[period_key(h["joined_on"], mode)]["Joined"] += 1
-    for i in await list_interviews(user, {}):
+    scope = await get_scope(user)
+    async for i in db.interviews.find(scope.q("app_child"), {"_id": 0, "date": 1}):
         p[period_key(i.get("date"), mode)]["Interviews"] += 1
     if data.get("cost"):
         for h in data["cost"]["hire_costs"]:

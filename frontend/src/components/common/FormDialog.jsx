@@ -82,7 +82,8 @@ function buildSchema(fields) {
 }
 
 function FieldInput({ f, field, list, testid }) {
-  const options = f.options || (f.master ? list(f.master).map((m) => ({ value: m.id, label: m.name, hint: m.skill_area })) : []);
+  const person = (m) => [m.designation, m.role_label && m.role_label !== "Interviewer" && m.role_label !== "Recruiter" ? m.role_label : null].filter(Boolean).join(", ");
+  const options = f.options || (f.master ? list(f.master).map((m) => ({ value: m.id, label: person(m) ? `${m.name} — ${person(m)}` : m.name, hint: m.skill_area })) : []);
   if (f.type === "textarea") return <Textarea {...field} value={field.value ?? ""} rows={f.rows || 3} data-testid={testid} />;
   if (f.type === "select" || f.master && f.type !== "multi") return <SelectField value={field.value} onChange={field.onChange} options={options} testid={testid} placeholder={f.placeholder || "Select…"} />;
   if (f.type === "multi") return <MultiSelect value={field.value || []} onChange={field.onChange} options={options} testid={testid} placeholder={f.placeholder} />;

@@ -30,6 +30,10 @@ ROLES = {"super_admin": "Super Admin", "recruiter": "Recruiter", "management": "
 # Retired roles and what existing accounts are moved to on startup (never to a role with more access).
 LEGACY_ROLES = {"hr_admin": "recruiter", "hiring_manager": "management"}
 ROLE_PERSON = {"recruiter": "recruiter", "interviewer": "interviewer"}
+# Additive roles: a role can carry another role's capabilities (permissions + person record) on top of its own.
+# Management members also interview: they get the Interviewer permissions and appear in the interviewer list,
+# but nothing else from it — and see only the interviews they are assigned to (unless the Super Admin allows more).
+ROLE_IMPLIES = {"management": ["interviewer"]}
 
 ALL_PERMS = {"users.manage", "users.super", "masters.manage", "settings.manage", "req.view", "req.manage",
              "cand.view", "cand.manage", "app.view", "app.create", "app.move", "app.decide", "interview.view",
@@ -111,7 +115,8 @@ def make_token(uid, kind, ttl):
 def public_user(u):
     return {k: u.get(k) for k in ("id", "email", "name", "role", "active", "phone", "designation",
                                   "must_change_password", "created_at", "last_login")} | {
-        "role_label": ROLES.get(u.get("role")), "permissions": sorted(PERMS.get(u.get("role"), set()))}
+        "role_label": " + ".join(ROLES.get(r, r) for r in effective_roles(u)), "roles": effective_roles(u),
+        "permissions": sorted(user_perms(u))}
 
 
 async def get_user(request: Request):
@@ -133,8 +138,24 @@ async def get_user(request: Request):
     return user
 
 
+def effective_roles(user):
+    """Primary role + roles it implies + any extra roles on the account (never Super Admin)."""
+    out = [user.get("role")]
+    for r in ROLE_IMPLIES.get(user.get("role"), []) + list(user.get("extra_roles") or []):
+        if r in ROLES and r != "super_admin" and r not in out:
+            out.append(r)
+    return out
+
+
+def user_perms(user):
+    perms = set()
+    for r in effective_roles(user):
+        perms |= PERMS.get(r, set())
+    return perms
+
+
 def can(user, perm):
-    return perm in PERMS.get(user["role"], set())
+    return perm in user_perms(user)
 
 
 def require(perm):
@@ -150,12 +171,15 @@ async def person_ids(user, ptype):
 
 
 class Scope:
-    def __init__(self, full=True, req_ids=(), app_ids=(), cand_ids=(), interviewer_ids=None):
+    def __init__(self, full=True, req_ids=(), app_ids=(), cand_ids=(), interviewer_ids=None, assigned_interviews_only=False):
         self.full = full
+        self.assigned_interviews_only = assigned_interviews_only  # full view of everything except interviews
         self.req_ids, self.app_ids, self.cand_ids = list(req_ids), list(app_ids), list(cand_ids)
         self.interviewer_ids = interviewer_ids
 
     def q(self, kind):
+        if kind == "interview" and self.assigned_interviews_only:
+            return {"interviewer_ids": {"$in": self.interviewer_ids or []}}
         if self.full:
             return {}
         if kind == "req":
@@ -175,6 +199,11 @@ async def _ids(coll, q, field="id"):
 
 async def get_scope(user):
     role = user["role"]
+    if role == "management":
+        s = await db.settings.find_one({"key": "general"}, {"management_view_all_interviews": 1}) or {}
+        if s.get("management_view_all_interviews"):
+            return Scope()
+        return Scope(interviewer_ids=await person_ids(user, "interviewer"), assigned_interviews_only=True)
     if role in FULL_SCOPE:
         return Scope()
     if role == "interviewer":
@@ -278,7 +307,9 @@ async def set_app_status(app, status, user, reason=None, auto=False, note="", ov
 
 
 async def recount_filled(req_id):
-    n = await db.joinings.count_documents({"requisition_id": req_id, "status": "Joined"})
+    # a position is filled by an application that is currently Joined (a joining record alone is history)
+    joined = [a["id"] async for a in db.applications.find({"requisition_id": req_id, "status": "Joined"}, {"id": 1})]
+    n = await db.joinings.count_documents({"requisition_id": req_id, "status": "Joined", "application_id": {"$in": joined}})
     await db.requisitions.update_one({"id": req_id}, {"$set": {"filled_positions": n}})
     return n
 

@@ -81,7 +81,7 @@ function Detail({ id, onClose, onChanged }) {
 
 export default function Interviews() {
   const { meta, list, can, user } = useAuth();
-  const [f, setF] = useState({ mine: user.role === "interviewer" ? "true" : "" });
+  const [f, setF] = useState({ mine: can("interview.manage") ? "" : "true" });
   const [sel, setSel] = useState(null);
   const { data, loading, reload } = useFetch("/interviews", f);
   const cols = [
@@ -105,11 +105,11 @@ export default function Interviews() {
       <DataTable testid="iv-table" columns={cols} data={data} loading={loading} onRowClick={(i) => setSel(i.id)} emptyHint="Schedule interviews from the pipeline or a candidate's application."
         toolbar={<>
           <SelectField value={f.status} onChange={(v) => setF({ ...f, status: v })} options={meta.interview_statuses.map((s) => ({ value: s, label: s }))} placeholder="All statuses" testid="iv-filter-status" className="w-36" />
-          {user.role !== "interviewer" && <SelectField value={f.interviewer_id} onChange={(v) => setF({ ...f, interviewer_id: v })} options={list("interviewer").map((m) => ({ value: m.id, label: m.name }))} placeholder="All interviewers" testid="iv-filter-interviewer" className="w-40" />}
+          {can("interview.manage") && <SelectField value={f.interviewer_id} onChange={(v) => setF({ ...f, interviewer_id: v })} options={list("interviewer").map((m) => ({ value: m.id, label: m.name }))} placeholder="All interviewers" testid="iv-filter-interviewer" className="w-40" />}
           <SelectField value={f.feedback_status} onChange={(v) => setF({ ...f, feedback_status: v })} options={["Pending", "Partial", "Complete"].map((s) => ({ value: s, label: `Feedback ${s}` }))} placeholder="Any feedback" testid="iv-filter-feedback" className="w-40" />
           <input type="date" className="h-9 rounded-md border px-2 text-xs" value={f.date_from || ""} onChange={(e) => setF({ ...f, date_from: e.target.value })} data-testid="iv-filter-from" />
           <input type="date" className="h-9 rounded-md border px-2 text-xs" value={f.date_to || ""} onChange={(e) => setF({ ...f, date_to: e.target.value })} data-testid="iv-filter-to" />
-          {user.role !== "interviewer" && <label className="flex items-center gap-2 text-xs text-zinc-600"><Switch checked={f.mine === "true"} onCheckedChange={(c) => setF({ ...f, mine: c ? "true" : "" })} data-testid="iv-filter-mine" />Mine only</label>}
+          {can("interview.manage") && <label className="flex items-center gap-2 text-xs text-zinc-600"><Switch checked={f.mine === "true"} onCheckedChange={(c) => setF({ ...f, mine: c ? "true" : "" })} data-testid="iv-filter-mine" />Mine only</label>}
         </>} />
       <Detail id={sel} onClose={() => setSel(null)} onChanged={reload} />
     </div>

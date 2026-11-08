@@ -93,8 +93,16 @@ async def migrate_roles():
             logger.info("roles: moved %d %s account(s) to %s", len(users), old, new)
 
 
+async def sync_people():
+    """Every account gets the person records its roles need (e.g. Management members appear in the interviewer list)."""
+    from core import ROLE_IMPLIES
+    async for u in db.users.find({"$or": [{"role": {"$in": list(ROLE_IMPLIES)}}, {"extra_roles.0": {"$exists": True}}]}, {"_id": 0, "password_hash": 0}):
+        await routes_admin.sync_person(u)
+
+
 async def seed():
     await migrate_roles()
+    await sync_people()
     for coll, models in INDEXES.items():
         for m in models:
             try:

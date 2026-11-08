@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from workflow import static_matrix
 from core import (db, get_user, require, can, make_token, hash_password, verify_password, public_user, now_iso,
-                  new_id, log_activity, get_settings, get_scope, get_visible, ROLES, ROLE_PERSON, PIPELINE, TERMINAL,
+                  new_id, log_activity, get_settings, get_scope, get_visible, effective_roles, ROLES, ROLE_PERSON, PIPELINE, TERMINAL,
                   ALL_STATUSES, REQ_STATUSES, INTERVIEW_STATUSES, INTERVIEW_MODES, OFFER_STATUSES, JOINING_STATUSES,
                   RECOMMENDATIONS, PAYMENT_STATUSES)
 import jwt
@@ -135,18 +135,25 @@ class UserUpdate(BaseModel):
 
 
 async def sync_person(user):
-    ptype = ROLE_PERSON.get(user["role"])
-    if not ptype:
-        return
-    if await db.masters.find_one({"type": ptype, "user_id": user["id"]}):
-        return
-    existing = await db.masters.find_one({"type": ptype, "user_id": None,
-                                          "name": {"$regex": f"^{re.escape(user['name'].strip())}$", "$options": "i"}})
-    if existing:
-        await db.masters.update_one({"id": existing["id"]}, {"$set": {"user_id": user["id"], "email": user["email"]}})
-    else:
-        await db.masters.insert_one({"id": new_id(), "type": ptype, "name": user["name"], "email": user["email"],
-                                     "user_id": user["id"], "active": True, "created_at": now_iso()})
+    """Make sure the user has a person record (recruiter / interviewer list) for every role they hold, incl. implied roles."""
+    held = {ROLE_PERSON[r] for r in effective_roles(user) if r in ROLE_PERSON}
+    # a person record for a role the user no longer holds is hidden from pick-lists (kept for past assignments)
+    await db.masters.update_many({"user_id": user["id"], "type": {"$in": [t for t in set(ROLE_PERSON.values()) if t not in held]}}, {"$set": {"active": False, "inactive_reason": "role"}})
+    for ptype in held:
+        extra = {"designation": user.get("designation"), "role_label": ROLES.get(user["role"])}
+        if await db.masters.find_one({"type": ptype, "user_id": user["id"]}):
+            await db.masters.update_many({"type": ptype, "user_id": user["id"]}, {"$set": extra})
+            # hidden only because of an earlier role change → visible again now the role is back
+            await db.masters.update_many({"type": ptype, "user_id": user["id"], "inactive_reason": "role"},
+                                         {"$set": {"active": True}, "$unset": {"inactive_reason": ""}})
+            continue
+        existing = await db.masters.find_one({"type": ptype, "user_id": None,
+                                              "name": {"$regex": f"^{re.escape(user['name'].strip())}$", "$options": "i"}})
+        if existing:
+            await db.masters.update_one({"id": existing["id"]}, {"$set": {"user_id": user["id"], "email": user["email"], **extra}})
+        else:
+            await db.masters.insert_one({"id": new_id(), "type": ptype, "name": user["name"], "email": user["email"],
+                                         "user_id": user["id"], "active": True, "created_at": now_iso(), **extra})
 
 
 def guard_role_change(actor, target_role=None, target_user=None):
@@ -257,6 +264,7 @@ class SettingsIn(BaseModel):
     stale_days: Optional[int] = None
     offer_expiry_alert_days: Optional[int] = None
     transitions: Optional[dict] = None
+    management_view_all_interviews: Optional[bool] = None  # let Management see every interview (read-only), not only their own
 
 
 @router.get("/meta")
@@ -453,3 +461,33 @@ async def cleanup(body: CleanupIn, user=Depends(require("users.super"))):
                        ", ".join(f"{k}: {v}" for k, v in deleted.items()))
     return environment() | {"deleted": deleted, "remaining": remaining, "verified": not any(remaining.values()),
                             "total_deleted": sum(v for k, v in deleted.items() if k != "master_links_cleared")}
+
+
+# ---------- one-time data migration: Joined → Screening (Super Admin) ----------
+class StatusMigrationIn(BaseModel):
+    confirm: str
+    database: str
+    expected_count: int
+
+
+@router.get("/admin/migrations/joined-to-screening")
+async def joined_to_screening_preview(user=Depends(require("users.super"))):
+    import data_migrations as dm
+    return await dm.preview() | {"confirm_phrase": dm.CONFIRM_PHRASE}
+
+
+@router.post("/admin/migrations/joined-to-screening")
+async def joined_to_screening_run(body: StatusMigrationIn, user=Depends(require("users.super"))):
+    import data_migrations as dm
+    if body.confirm.strip() != dm.CONFIRM_PHRASE:
+        raise HTTPException(400, f"Type '{dm.CONFIRM_PHRASE}' to confirm")
+    if body.database.strip() != os.environ["DB_NAME"]:
+        raise HTTPException(400, f"Database name does not match the connected database ({os.environ['DB_NAME']})")
+    try:
+        out = await dm.run(user["name"], user["id"], body.expected_count)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    if not out.get("already_applied"):
+        await log_activity(user, "data_migration", "system", dm.MIGRATION_ID, "Joined → Screening migration",
+                           f"{out['changed']} application(s) moved · backup {out['backup_id']} · verified {out['ok']}")
+    return dm.environment() | out

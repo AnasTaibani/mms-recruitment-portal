@@ -73,8 +73,8 @@ function Transitions() {
 function General() {
   const { meta, reloadRef } = useAuth();
   const [v, setV] = useState({});
-  useEffect(() => { setV({ rating_scale: String(meta.settings.rating_scale || 5), stale_days: meta.settings.stale_days, offer_expiry_alert_days: meta.settings.offer_expiry_alert_days }); }, [meta]);
-  const save = async () => { try { await api.put("/settings", { rating_scale: Number(v.rating_scale), stale_days: Number(v.stale_days), offer_expiry_alert_days: Number(v.offer_expiry_alert_days) }); toast.success("Settings saved"); reloadRef(); } catch (e) { toast.error(errMsg(e)); } };
+  useEffect(() => { setV({ rating_scale: String(meta.settings.rating_scale || 5), stale_days: meta.settings.stale_days, offer_expiry_alert_days: meta.settings.offer_expiry_alert_days, management_view_all_interviews: !!meta.settings.management_view_all_interviews }); }, [meta]);
+  const save = async () => { try { await api.put("/settings", { rating_scale: Number(v.rating_scale), stale_days: Number(v.stale_days), offer_expiry_alert_days: Number(v.offer_expiry_alert_days), management_view_all_interviews: !!v.management_view_all_interviews }); toast.success("Settings saved"); reloadRef(); } catch (e) { toast.error(errMsg(e)); } };
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Section title="Workflow settings">
@@ -82,6 +82,8 @@ function General() {
           <div className="space-y-1"><Label className="text-xs">Interview rating scale</Label><SelectField value={v.rating_scale} onChange={(x) => setV({ ...v, rating_scale: x })} allowNone={false} options={["3", "4", "5", "10"].map((s) => ({ value: s, label: `1 – ${s}` }))} testid="setting-rating-scale" /></div>
           <div className="space-y-1"><Label className="text-xs">Flag candidates stuck in a stage after (days)</Label><Input type="number" value={v.stale_days ?? ""} onChange={(e) => setV({ ...v, stale_days: e.target.value })} data-testid="setting-stale-days" /></div>
           <div className="space-y-1"><Label className="text-xs">Alert before offer expiry (days)</Label><Input type="number" value={v.offer_expiry_alert_days ?? ""} onChange={(e) => setV({ ...v, offer_expiry_alert_days: e.target.value })} data-testid="setting-expiry-days" /></div>
+          <label className="flex items-start gap-3 text-sm"><Switch checked={!!v.management_view_all_interviews} onCheckedChange={(x) => setV({ ...v, management_view_all_interviews: x })} data-testid="setting-mgmt-all-interviews" />
+            <span>Management can view all interviews<span className="block text-xs text-zinc-500">Off: Management members see only the interviews they are assigned to (their dashboards still show organisation-wide counts). They can never change interviews they are not assigned to.</span></span></label>
           <Button onClick={save} data-testid="settings-save">Save settings</Button>
         </div>
       </Section>
@@ -91,6 +93,57 @@ function General() {
           <div key={l} className="mb-3"><p className="eyebrow mb-1.5">{l}</p><div className="flex flex-wrap gap-1.5">{arr.map((s) => <StatusBadge key={s} status={s} />)}</div></div>))}
       </Section>
     </div>
+  );
+}
+
+function StatusMigration() {
+  const { data: p, reload, loading } = useFetch("/admin/migrations/joined-to-screening");
+  const [confirm, setConfirm] = useState("");
+  const [db, setDb] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  if (loading || !p) return <Section title="Status migration: Joined → Screening"><Loader2 className="h-4 w-4 animate-spin text-zinc-400" /></Section>;
+  const run = async () => {
+    setBusy(true);
+    try { const { data } = await api.post("/admin/migrations/joined-to-screening", { confirm, database: db, expected_count: p.count }); setResult(data); setConfirm(""); setDb(""); reload(); toast.success(data.already_applied ? "Already applied — nothing changed" : `${data.changed} application(s) moved to Screening`); }
+    catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
+  };
+  return (
+    <Section title="Status migration: Joined → Screening" testid="status-migration">
+      <div className="space-y-3 text-sm">
+        <p className="text-xs text-zinc-500">One-time change of the <b>current stage</b> of every application now in Joined to Screening ({p.reason}). Candidates, offers, joining records and dates, interview feedback, CTC and fees, and history are kept. The affected applications are backed up first; the run is verified and can be rolled back from the backup with the migration script.</p>
+        <div className="grid gap-2 sm:grid-cols-4 text-xs">
+          <div><p className="eyebrow">Environment</p><p data-testid="mig-env">{p.environment}</p></div>
+          <div><p className="eyebrow">Database</p><p className="font-mono">{p.database}</p></div>
+          <div><p className="eyebrow">Host</p><p className="font-mono">{p.mongo_host}</p></div>
+          <div><p className="eyebrow">Applications in total</p><p>{p.total_applications}</p></div>
+        </div>
+        {p.already_applied ? (
+          <p className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800" data-testid="mig-done"><CheckCircle2 className="h-4 w-4" />Completed on {p.last_run?.completed_at?.slice(0, 16).replace("T", " ")} — {p.last_run?.changed} application(s) moved. Running it again changes nothing.</p>
+        ) : (
+          <>
+            <p className="font-semibold" data-testid="mig-count">{p.count} application(s) are currently Joined and would move to Screening.</p>
+            {p.closed_requisitions_affected.length > 0 && <p className="text-xs text-amber-800">Some belong to closed / filled requisitions ({p.closed_requisitions_affected.join(", ")}); requisition status is not changed.</p>}
+            {p.count > 0 && <DataTable testid="mig-table" data={p.applications} pageSize={6} columns={[{ key: "application_code", label: "Application" }, { key: "candidate", label: "Candidate" },
+              { key: "requisition_code", label: "Requisition" }, { key: "actual_join_date", label: "Joined on" }, { key: "has_cost", label: "Cost on record", render: (r) => (r.has_cost ? "Yes" : "No") }]} />}
+            {p.count > 0 && (
+              <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <div className="space-y-1"><Label className="text-xs">Type <b>{p.confirm_phrase}</b></Label><Input value={confirm} onChange={(e) => setConfirm(e.target.value)} data-testid="mig-confirm" /></div>
+                <div className="space-y-1"><Label className="text-xs">Type the database name <b>{p.database}</b></Label><Input value={db} onChange={(e) => setDb(e.target.value)} data-testid="mig-db" /></div>
+                <Button variant="destructive" disabled={busy || confirm !== p.confirm_phrase || db !== p.database} onClick={run} data-testid="mig-run">{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Move {p.count} to Screening</Button>
+              </div>
+            )}
+          </>
+        )}
+        {result?.verification && (
+          <div className="rounded-md border border-zinc-200 p-3 text-xs" data-testid="mig-result">
+            <p className="font-semibold">{result.ok ? "Verified" : "Needs review"} — {result.changed} moved · backup {result.backup_id}</p>
+            <p>All targets in Screening: {String(result.verification.all_moved)} · application count unchanged: {String(result.verification.application_count_unchanged)} · other applications untouched: {String(result.verification.other_applications_untouched)} · transactional: {String(result.verification.transactional)}</p>
+            <p>Related records kept: {Object.entries(result.verification.related_records_kept).map(([k, v]) => `${k} ${v}`).join(", ")} · cost records kept: {result.verification.hire_costs_kept}</p>
+          </div>
+        )}
+      </div>
+    </Section>
   );
 }
 
@@ -157,7 +210,7 @@ export default function SettingsPage() {
         <TabsContent value="masters"><Masters /></TabsContent>
         <TabsContent value="transitions"><Transitions /></TabsContent>
         <TabsContent value="general"><General /></TabsContent>
-        {can("users.super") && <TabsContent value="cleanup"><DataCleanup /></TabsContent>}
+        {can("users.super") && <TabsContent value="cleanup" className="space-y-4"><StatusMigration /><DataCleanup /></TabsContent>}
       </Tabs>
     </div>
   );

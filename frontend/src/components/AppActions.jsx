@@ -24,7 +24,8 @@ export function AppActions({ app, onDone }) {
   const allowed = useAllowedMoves()(app.status);
   const [move, setMove] = useState(null);
   const [dlg, setDlg] = useState(null);
-  const any = allowed.length || can("interview.manage") || can("selection.decide") || can("offer.manage") || can("cost.view");
+  const any = allowed.length || can("interview.manage") || can("selection.decide") || can("offer.manage")
+    || (can("cost.view") && ["Offer Accepted", "Joined"].includes(app.status));
   if (!any) return null;
   return (
     <div onClick={(e) => e.stopPropagation()}>

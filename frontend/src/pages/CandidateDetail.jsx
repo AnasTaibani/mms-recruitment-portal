@@ -32,17 +32,17 @@ function Applications({ c, reload }) {
         <Section key={a.id} testid={`application-${a.code}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="font-mono text-[11px] text-zinc-400">{a.code} · {a.requisition_code}</p>
-              <Link to={`/requisitions/${a.requisition_id}`} className="text-base font-semibold text-zinc-900 hover:underline">{a.requisition_title}</Link>
-              <p className="text-xs text-zinc-500">{a.department || "—"} · Recruiter {a.recruiter || "—"} · {a.days_in_stage} day(s) in stage {a.stuck && <b className="text-amber-700">· stuck</b>}</p>
+              <p className="font-mono text-[11px] text-[#9AA2AE]">{a.code} · {a.requisition_code}</p>
+              <Link to={`/requisitions/${a.requisition_id}`} className="text-base font-semibold text-ink hover:underline">{a.requisition_title}</Link>
+              <p className="text-xs text-subtle">{a.department || "—"} · Recruiter {a.recruiter || "—"} · {a.days_in_stage} day(s) in stage {a.stuck && <b className="text-amber-700">· stuck</b>}</p>
               {["Offer Accepted", "Joined"].includes(a.status) && <p className="mt-1 text-xs" data-testid={`application-cost-${a.code}`}>Cost per hire: {a.hire_cost
-                ? <b className="text-zinc-700">{lakhs(a.hire_cost.total)} (CTC {lakhs(a.hire_cost.ctc)} + consulting {lakhs(a.hire_cost.consulting_fee)} + recruiter {lakhs(a.hire_cost.recruiter_fee)})</b>
+                ? <b className="text-[#3A414C]">{lakhs(a.hire_cost.total)} (CTC {lakhs(a.hire_cost.ctc)} + consulting {lakhs(a.hire_cost.consulting_fee)} + recruiter {lakhs(a.hire_cost.recruiter_fee)})</b>
                 : <b className="text-amber-700">not confirmed{a.status === "Joined" ? " — not counted as a completed hire" : " — required before joining"}</b>}</p>}
               {a.interview_waiver && <p className="mt-1 text-xs text-amber-800">Interviews waived by {a.interview_waiver.by}: {a.interview_waiver.reason}</p>}
             </div>
             <div className="flex items-center gap-2"><StatusBadge status={a.status} testid={`application-status-${a.code}`} /><AppActions app={a} onDone={reload} /></div>
           </div>
-          <div className="mt-4 border-t border-zinc-100 pt-4">
+          <div className="mt-4 border-t border-[#EEF1F5] pt-4">
             <Timeline items={[...(a.history || [])].reverse().map((h) => ({ title: h.from ? `${h.from} → ${h.status}` : h.status, details: [h.reason, h.note, h.override && `EXCEPTION: ${h.override_reason}`].filter(Boolean).join(" · "), meta: `${h.by}${h.auto ? " (automatic)" : ""} · ${fmtDateTime(h.at)}` }))} />
           </div>
         </Section>
@@ -57,7 +57,7 @@ export default function CandidateDetail() {
   const { data: c, reload } = useFetch(`/candidates/${id}`);
   const [dlg, setDlg] = useState(null);
   const fileRef = useRef();
-  if (!c) return <p className="text-sm text-zinc-400">Loading…</p>;
+  if (!c) return <p className="text-sm text-[#9AA2AE]">Loading…</p>;
   const upload = async (file) => {
     if (!file) return;
     const fd = new FormData();
@@ -94,17 +94,17 @@ export default function CandidateDetail() {
         </TabsContent>
         <TabsContent value="interviews">
           <Section>{!c.interviews.length ? <EmptyState title="No interviews" /> : c.interviews.map((i) => (
-            <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 py-3 last:border-0">
-              <div><p className="text-sm font-medium">Round {i.round_number} · {i.round_name}</p><p className="text-xs text-zinc-500">{i.code} · {fmtDate(i.date)} {i.start_time || ""} · {i.mode || "—"}</p></div>
+            <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-[#EEF1F5] py-3 last:border-0">
+              <div><p className="text-sm font-medium">Round {i.round_number} · {i.round_name}</p><p className="text-xs text-subtle">{i.code} · {fmtDate(i.date)} {i.start_time || ""} · {i.mode || "—"}</p></div>
               <div className="flex gap-2"><StatusBadge status={i.status} /><StatusBadge status={i.outcome} /></div>
             </div>))}</Section>
         </TabsContent>
         <TabsContent value="offers">
           <div className="grid gap-4 lg:grid-cols-2">
             <Section title="Offers">{!c.offers.length ? <EmptyState title="No offers" /> : c.offers.map((o) => (
-              <div key={o.id} className="flex items-center justify-between border-b border-zinc-100 py-2.5 last:border-0"><div><p className="text-sm font-medium">{o.designation} · {lakhs(o.ctc)}</p><p className="text-xs text-zinc-500">{o.code} · valid until {fmtDate(o.validity_date)}</p></div><StatusBadge status={o.status} /></div>))}</Section>
+              <div key={o.id} className="flex items-center justify-between border-b border-[#EEF1F5] py-2.5 last:border-0"><div><p className="text-sm font-medium">{o.designation} · {lakhs(o.ctc)}</p><p className="text-xs text-subtle">{o.code} · valid until {fmtDate(o.validity_date)}</p></div><StatusBadge status={o.status} /></div>))}</Section>
             <Section title="Joining">{!c.joinings.length ? <EmptyState title="No joining records" /> : c.joinings.map((j) => (
-              <div key={j.id} className="flex items-center justify-between border-b border-zinc-100 py-2.5 last:border-0"><div><p className="text-sm font-medium">{j.code}</p><p className="text-xs text-zinc-500">Tentative {fmtDate(j.tentative_date)} · Actual {fmtDate(j.actual_date)}</p></div><StatusBadge status={j.status} /></div>))}</Section>
+              <div key={j.id} className="flex items-center justify-between border-b border-[#EEF1F5] py-2.5 last:border-0"><div><p className="text-sm font-medium">{j.code}</p><p className="text-xs text-subtle">Tentative {fmtDate(j.tentative_date)} · Actual {fmtDate(j.actual_date)}</p></div><StatusBadge status={j.status} /></div>))}</Section>
           </div>
         </TabsContent>
         <TabsContent value="activity"><Section><HistoryTab entity="candidate" id={id} /></Section></TabsContent>

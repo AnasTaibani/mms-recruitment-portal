@@ -21,7 +21,7 @@ export default function Activity() {
         </>}
         columns={[{ key: "at", label: "When", render: (a) => <span className="whitespace-nowrap text-xs">{fmtDateTime(a.at)}</span> }, { key: "user_name", label: "User" },
           { key: "action", label: "Action", render: (a) => <span className="font-mono text-[11px]">{a.action}</span> }, { key: "entity", label: "Record type" },
-          { key: "label", label: "Record", render: (a) => <span className="font-medium text-zinc-900">{a.label}</span> }, { key: "details", label: "Details", className: "text-xs max-w-md" }]} />
+          { key: "label", label: "Record", render: (a) => <span className="font-medium text-ink">{a.label}</span> }, { key: "details", label: "Details", className: "text-xs max-w-md" }]} />
     </div>
   );
 }

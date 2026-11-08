@@ -1,13 +1,14 @@
 import { cn } from "@/lib/utils";
 
 const TONES = {
-  green: "bg-emerald-50 text-emerald-800 border-emerald-200 [&>i]:bg-emerald-500",
-  amber: "bg-amber-50 text-amber-800 border-amber-200 [&>i]:bg-amber-500",
-  rose: "bg-rose-50 text-rose-800 border-rose-200 [&>i]:bg-rose-500",
-  plum: "bg-stone-100 text-stone-700 border-stone-300 [&>i]:bg-stone-500",
-  zinc: "bg-zinc-100 text-zinc-700 border-zinc-200 [&>i]:bg-zinc-400",
-  orange: "bg-orange-50 text-orange-800 border-orange-200 [&>i]:bg-orange-500",
-  dark: "bg-[#18181B] text-white border-[#18181B] [&>i]:bg-white",
+  // restrained semantic colours; offer stages use the brand blue
+  green: "bg-[#EAF6EF] text-[#2F6E4C] border-[#CFE8DA] [&>i]:bg-[#3E8E63]",
+  amber: "bg-[#FBF4E6] text-[#8A6420] border-[#F0DFBD] [&>i]:bg-[#C08A2E]",
+  rose: "bg-[#FBEDEC] text-[#9E3B37] border-[#F1D2D0] [&>i]:bg-[#C0504D]",
+  plum: "bg-brand-pale text-brand-deep border-[#CFE3FB] [&>i]:bg-brand-royal",
+  zinc: "bg-[#F1F3F6] text-[#4B5361] border-line [&>i]:bg-[#AEB5BF]",
+  orange: "bg-[#FCF1E7] text-[#9A5320] border-[#F3D8C0] [&>i]:bg-[#D2793A]",
+  dark: "bg-brand-deep text-white border-brand-deep [&>i]:bg-white",
 };
 
 const MAP = {
@@ -21,9 +22,9 @@ const MAP = {
 const toneOf = (s) => Object.keys(MAP).find((k) => MAP[k].includes(s)) || "zinc";
 
 export function StatusBadge({ status, tone, className, testid }) {
-  if (!status) return <span className="text-zinc-400">—</span>;
+  if (!status) return <span className="text-[#9AA2AE]">—</span>;
   return (
-    <span data-testid={testid} className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold", TONES[tone || toneOf(status)], className)}>
+    <span data-testid={testid} className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-[6px] border px-2 py-[1px] text-[12px] font-medium leading-5", TONES[tone || toneOf(status)], className)}>
       <i className="h-1.5 w-1.5 rounded-full" />
       {status}
     </span>

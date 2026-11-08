@@ -41,7 +41,7 @@ function OfferDetail({ offer, onClose, onChanged }) {
   return (
     <Sheet open={!!offer} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="offer-detail">
-        <SheetHeader><p className="font-mono text-[11px] text-zinc-400">{offer.code}</p><SheetTitle>{offer.candidate_name}</SheetTitle><p className="text-sm text-zinc-500">{offer.designation} · {offer.requisition_title}</p></SheetHeader>
+        <SheetHeader><p className="font-mono text-[11px] text-[#9AA2AE]">{offer.code}</p><SheetTitle>{offer.candidate_name}</SheetTitle><p className="text-sm text-subtle">{offer.designation} · {offer.requisition_title}</p></SheetHeader>
         <div className="my-4 flex gap-2"><StatusBadge status={offer.status} testid="offer-status" /><StatusBadge status={offer.approval_status} /></div>
         <div className="grid grid-cols-2 gap-4">
           <Info label="Offered CTC">{lakhs(offer.ctc)}</Info><Info label="Breakdown">Fixed {lakhs(offer.fixed)} · Var {lakhs(offer.variable)} · Other {lakhs(offer.other)}</Info>
@@ -78,7 +78,7 @@ export default function Offers() {
   const today = new Date().toISOString().slice(0, 10);
   const cols = [
     { key: "code", label: "Offer ID", render: (o) => <span className="font-mono text-xs">{o.code}</span> },
-    { key: "candidate_name", label: "Candidate", render: (o) => <span className="font-medium text-zinc-900">{o.candidate_name}</span> },
+    { key: "candidate_name", label: "Candidate", render: (o) => <span className="font-medium text-ink">{o.candidate_name}</span> },
     { key: "requisition_title", label: "Role" },
     { key: "designation", label: "Designation" },
     { key: "ctc", label: "CTC", render: (o) => lakhs(o.ctc) },
@@ -86,7 +86,7 @@ export default function Offers() {
     { key: "approval_status", label: "Approval", render: (o) => <StatusBadge status={o.approval_status} /> },
     { key: "release_date", label: "Released", render: (o) => fmtDate(o.release_date) },
     { key: "validity_date", label: "Valid until", render: (o) => <span className={o.status === "Released" && o.validity_date <= today ? "font-semibold text-rose-700" : ""}>{fmtDate(o.validity_date)}</span> },
-    { key: "document", label: "Doc", sortable: false, render: (o) => (o.document ? <FileText className="h-4 w-4 text-zinc-500" /> : "—") },
+    { key: "document", label: "Doc", sortable: false, render: (o) => (o.document ? <FileText className="h-4 w-4 text-subtle" /> : "—") },
   ];
   const pending = (data || []).filter((o) => o.status === "Approval Pending").length;
   return (

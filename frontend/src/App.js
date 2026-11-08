@@ -24,9 +24,9 @@ import Profile from "@/pages/Profile";
 
 function Guard({ perm, children }) {
   const { user, meta, can } = useAuth();
-  if (user === null || (user && !meta)) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-zinc-400" /></div>;
+  if (user === null || (user && !meta)) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#9AA2AE]" /></div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (perm && !can(perm)) return <div className="py-20 text-center text-sm text-zinc-500" data-testid="no-access">You do not have access to this page.</div>;
+  if (perm && !can(perm)) return <div className="py-20 text-center text-sm text-subtle" data-testid="no-access">You do not have access to this page.</div>;
   return children;
 }
 

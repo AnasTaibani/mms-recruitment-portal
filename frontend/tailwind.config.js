@@ -14,7 +14,16 @@ module.exports = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)'
       },
+      fontFamily: {
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+      },
       colors: {
+        brand: { sky: '#A0D5FC', blue: '#67B5F4', royal: '#4089DE', deep: '#2265C8', pale: '#EDF5FE', mist: '#F4F9FF' },
+        ink: '#20242B',
+        subtle: '#737B87',
+        line: '#E8EBEF',
+        canvas: '#F7F8FA',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

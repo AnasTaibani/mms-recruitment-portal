@@ -35,7 +35,7 @@ export function MultiSelect({ value = [], onChange, options, placeholder = "Sele
     <Popover>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" className="h-auto min-h-9 w-full justify-between font-normal" data-testid={testid}>
-          <span className="truncate text-left">{labels.length ? labels.join(", ") : <span className="text-zinc-400">{placeholder}</span>}</span>
+          <span className="truncate text-left">{labels.length ? labels.join(", ") : <span className="text-[#9AA2AE]">{placeholder}</span>}</span>
           <ChevronsUpDown className="h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -46,13 +46,13 @@ export function MultiSelect({ value = [], onChange, options, placeholder = "Sele
             const on = value.includes(o.value);
             return (
               <button type="button" key={o.value} data-testid={`${testid}-opt-${o.label}`} onClick={() => onChange(on ? value.filter((v) => v !== o.value) : [...value, o.value])}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100">
-                <span className={cn("flex h-4 w-4 items-center justify-center rounded border", on ? "border-[#18181B] bg-[#18181B] text-white" : "border-zinc-300")}>{on && <Check className="h-3 w-3" />}</span>
-                {o.label}{o.hint && <span className="ml-auto text-[11px] text-zinc-400">{o.hint}</span>}
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-[#EEF1F5]">
+                <span className={cn("flex h-4 w-4 items-center justify-center rounded border", on ? "border-brand-deep bg-brand-deep text-white" : "border-[#D5DBE3]")}>{on && <Check className="h-3 w-3" />}</span>
+                {o.label}{o.hint && <span className="ml-auto text-[11px] text-[#9AA2AE]">{o.hint}</span>}
               </button>
             );
           })}
-          {!shown.length && <p className="p-2 text-xs text-zinc-500">No options</p>}
+          {!shown.length && <p className="p-2 text-xs text-subtle">No options</p>}
         </div>
       </PopoverContent>
     </Popover>
@@ -135,9 +135,9 @@ export function FormDialog({ open, onOpenChange, title, description, fields, ini
           <div className={cn("grid gap-4", wide && "sm:grid-cols-2")}>
             {fields.map((f) => (
               <div key={f.name} className={cn("space-y-1.5", (f.full || f.type === "textarea") && "sm:col-span-2")}>
-                <Label className="text-xs font-semibold text-zinc-600">{f.label}{f.required && <span className="text-rose-600"> *</span>}</Label>
+                <Label className="text-xs font-semibold text-[#4B5361]">{f.label}{f.required && <span className="text-rose-600"> *</span>}</Label>
                 <Controller name={f.name} control={control} render={({ field }) => <FieldInput f={f} field={field} list={list} testid={`${testid}-${f.name}`} />} />
-                {f.help && <p className="text-[11px] text-zinc-400">{typeof f.help === "function" ? f.help(values || {}) : f.help}</p>}
+                {f.help && <p className="text-[11px] text-[#9AA2AE]">{typeof f.help === "function" ? f.help(values || {}) : f.help}</p>}
                 {errors[f.name] && <p className="text-xs text-rose-600" data-testid={`${testid}-${f.name}-error`}>{errors[f.name].message}</p>}
               </div>
             ))}

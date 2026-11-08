@@ -37,10 +37,10 @@ export default function RequisitionDetail() {
   const { can, meta } = useAuth();
   const { data: r, reload } = useFetch(`/requisitions/${id}`);
   const [dlg, setDlg] = useState(null);
-  if (!r) return <p className="text-sm text-zinc-400">Loading…</p>;
+  if (!r) return <p className="text-sm text-[#9AA2AE]">Loading…</p>;
   const apps = r.applications || [];
   const cols = [
-    { key: "candidate_name", label: "Candidate", render: (a) => <Link to={`/candidates/${a.candidate_id}`} className="font-medium text-zinc-900 hover:underline">{a.candidate_name}</Link> },
+    { key: "candidate_name", label: "Candidate", render: (a) => <Link to={`/candidates/${a.candidate_id}`} className="font-medium text-ink hover:underline">{a.candidate_name}</Link> },
     { key: "candidate_email", label: "Email" },
     { key: "current_company", label: "Company" },
     { key: "total_exp", label: "Exp" },
@@ -63,12 +63,12 @@ export default function RequisitionDetail() {
         <Section><p className="eyebrow">Positions filled</p><p className="mt-1 text-2xl font-extrabold" data-testid="req-filled">{r.filled_positions || 0} / {r.positions}</p><Progress value={r.positions ? (r.filled_positions / r.positions) * 100 : 0} className="mt-2 h-1.5" /></Section>
         <Section><p className="eyebrow">Open positions</p><p className="mt-1 text-2xl font-extrabold">{r.open_positions}</p></Section>
         <Section><p className="eyebrow">Candidates / active</p><p className="mt-1 text-2xl font-extrabold">{r.candidates_count} / {r.active_count}</p></Section>
-        <Section><p className="eyebrow">Recruitment age</p><p className="mt-1 text-2xl font-extrabold">{r.age_days ?? "—"}{r.age_days != null && " d"}</p><p className="text-[11px] text-zinc-400">From {fmtDate(r.effective_start)}</p></Section>
+        <Section><p className="eyebrow">Recruitment age</p><p className="mt-1 text-2xl font-extrabold">{r.age_days ?? "—"}{r.age_days != null && " d"}</p><p className="text-[11px] text-[#9AA2AE]">From {fmtDate(r.effective_start)}</p></Section>
       </div>
       <Tabs defaultValue="pipeline">
         <TabsList><TabsTrigger value="pipeline" data-testid="tab-pipeline">Pipeline</TabsTrigger><TabsTrigger value="details" data-testid="tab-details">Details</TabsTrigger><TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger></TabsList>
         <TabsContent value="pipeline" className="space-y-4">
-          <div className="flex flex-wrap gap-2">{[...meta.pipeline, ...meta.terminal].filter((s) => r.by_status[s]).map((s) => <span key={s} className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs">{s} <b>{r.by_status[s]}</b></span>)}</div>
+          <div className="flex flex-wrap gap-2">{[...meta.pipeline, ...meta.terminal].filter((s) => r.by_status[s]).map((s) => <span key={s} className="rounded-full border border-line bg-white px-3 py-1 text-xs">{s} <b>{r.by_status[s]}</b></span>)}</div>
           <DataTable testid="req-apps-table" columns={cols} data={apps} emptyTitle="No candidates linked yet" />
         </TabsContent>
         <TabsContent value="details">

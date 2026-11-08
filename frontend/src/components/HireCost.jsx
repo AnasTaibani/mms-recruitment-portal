@@ -47,7 +47,7 @@ export function HireCostPanel({ app, onSaved, compact }) {
     } catch (e) { toast.error(errMsg(e)); }
   }, [app.id]);
   useEffect(() => { load(); }, [load]);
-  if (!data) return <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />;
+  if (!data) return <Loader2 className="h-4 w-4 animate-spin text-[#9AA2AE]" />;
   const hc = data.hire_cost;
   const errors = checkHireCost(v);
   const valid = !Object.keys(errors).length;
@@ -68,33 +68,33 @@ export function HireCostPanel({ app, onSaved, compact }) {
 
   return (
     <div className="space-y-4" data-testid="hire-cost-panel">
-      <p className="text-xs text-zinc-500">Cost per Hire = Candidate annual CTC + Consulting fees + Recruiter fees. All amounts in ₹ lakhs (INR). Required before the candidate is marked Joined.</p>
+      <p className="text-xs text-subtle">Cost per Hire = Candidate annual CTC + Consulting fees + Recruiter fees. All amounts in ₹ lakhs (INR). Required before the candidate is marked Joined.</p>
       {hc && !editing ? (
         <div className="space-y-3">
           <Breakdown hc={hc} />
-          <p className="text-[11px] text-zinc-500" data-testid="hire-cost-confirmed">Confirmed by {hc.confirmed_by} · {fmtDateTime(hc.confirmed_at)}
+          <p className="text-[11px] text-subtle" data-testid="hire-cost-confirmed">Confirmed by {hc.confirmed_by} · {fmtDateTime(hc.confirmed_at)}
             {hc.version > 1 && ` · last changed by ${hc.updated_by} · ${fmtDateTime(hc.updated_at)}`}</p>
           {data.can_edit && <Button size="sm" variant="outline" onClick={() => setEditing(true)} data-testid="hire-cost-edit"><Pencil className="mr-1.5 h-3.5 w-3.5" />Change cost details</Button>}
         </div>
       ) : !data.can_edit ? (
         <p className="text-sm text-amber-800">Recruitment cost is not confirmed yet. A Recruiter (HR) or Super Admin confirms it.</p>
       ) : !canConfirm ? (
-        <p className="text-sm text-zinc-600">The cost is confirmed once the offer is accepted (current stage: {data.status}).</p>
+        <p className="text-sm text-[#4B5361]">The cost is confirmed once the offer is accepted (current stage: {data.status}).</p>
       ) : (
         <div className="space-y-3">
-          {!hc && data.suggested?.ctc_source && <p className="text-[11px] text-zinc-500">CTC pre-filled from the {data.suggested.ctc_source}{(data.suggested.consulting_fee != null || data.suggested.recruiter_fee != null) && "; fees from recorded cost entries"} — check before confirming.</p>}
+          {!hc && data.suggested?.ctc_source && <p className="text-[11px] text-subtle">CTC pre-filled from the {data.suggested.ctc_source}{(data.suggested.consulting_fee != null || data.suggested.recruiter_fee != null) && "; fees from recorded cost entries"} — check before confirming.</p>}
           <div className={compact ? "grid gap-3 sm:grid-cols-3" : "grid gap-3 sm:grid-cols-3"}>
             {FIELDS.map(([k, label, hint]) => (
               <div key={k} className="space-y-1">
                 <Label className="text-xs">{label} (₹ L) *</Label>
                 <Input type="number" step="any" min="0" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} onBlur={() => setTouched(true)} data-testid={`hire-cost-${k}`} />
-                <p className={`text-[11px] ${touched && errors[k] ? "text-rose-600" : "text-zinc-400"}`} data-testid={`hire-cost-${k}-msg`}>{touched && errors[k] ? errors[k] : rupees(v[k]) || hint}</p>
+                <p className={`text-[11px] ${touched && errors[k] ? "text-rose-600" : "text-[#9AA2AE]"}`} data-testid={`hire-cost-${k}-msg`}>{touched && errors[k] ? errors[k] : rupees(v[k]) || hint}</p>
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-zinc-200/80 bg-zinc-900/[0.02] px-3 py-2">
-            <span className="text-sm text-zinc-600">Cost per Hire</span>
-            <span className="text-base font-semibold text-zinc-900" data-testid="hire-cost-total">{total === null ? "—" : `${lakhs(total)} · ${rupees(total)}`}</span>
+          <div className="flex items-center justify-between rounded-lg border border-line/80 bg-zinc-900/[0.02] px-3 py-2">
+            <span className="text-sm text-[#4B5361]">Cost per Hire</span>
+            <span className="text-base font-semibold text-ink" data-testid="hire-cost-total">{total === null ? "—" : `${lakhs(total)} · ${rupees(total)}`}</span>
           </div>
           {hc && (
             <div className="space-y-1"><Label className="text-xs">Reason for the change *</Label>
@@ -110,12 +110,12 @@ export function HireCostPanel({ app, onSaved, compact }) {
       {data.history?.length > 0 && !compact && (
         <div>
           <p className="eyebrow mb-1.5">Cost history</p>
-          <ul className="space-y-1.5 text-xs text-zinc-600" data-testid="hire-cost-history">
+          <ul className="space-y-1.5 text-xs text-[#4B5361]" data-testid="hire-cost-history">
             {[...data.history].reverse().map((h, i) => (
-              <li key={i} className="rounded-md border border-zinc-200/70 px-2.5 py-1.5">
+              <li key={i} className="rounded-md border border-line/70 px-2.5 py-1.5">
                 <b>{h.action}</b> by {h.by} · {fmtDateTime(h.at)}
-                <div>{h.previous && <span className="text-zinc-400 line-through">{lakhs(h.previous.total)}</span>} {lakhs(h.new.total)}
-                  <span className="text-zinc-400"> (CTC {lakhs(h.new.ctc)} + consulting {lakhs(h.new.consulting_fee)} + recruiter {lakhs(h.new.recruiter_fee)})</span></div>
+                <div>{h.previous && <span className="text-[#9AA2AE] line-through">{lakhs(h.previous.total)}</span>} {lakhs(h.new.total)}
+                  <span className="text-[#9AA2AE]"> (CTC {lakhs(h.new.ctc)} + consulting {lakhs(h.new.consulting_fee)} + recruiter {lakhs(h.new.recruiter_fee)})</span></div>
                 {h.reason && <div className="italic">“{h.reason}”</div>}
               </li>
             ))}
@@ -131,9 +131,9 @@ function Breakdown({ hc }) {
     <table className="w-full max-w-md text-sm" data-testid="hire-cost-breakdown">
       <tbody>
         {[["Candidate annual CTC", hc.ctc], ["Consulting fees", hc.consulting_fee], ["Recruiter fees", hc.recruiter_fee]].map(([l, x]) => (
-          <tr key={l}><td className="py-0.5 text-zinc-600">{l}</td><td className="py-0.5 text-right">{lakhs(x)}</td><td className="py-0.5 pl-3 text-right text-xs text-zinc-400">{rupees(x)}</td></tr>
+          <tr key={l}><td className="py-0.5 text-[#4B5361]">{l}</td><td className="py-0.5 text-right">{lakhs(x)}</td><td className="py-0.5 pl-3 text-right text-xs text-[#9AA2AE]">{rupees(x)}</td></tr>
         ))}
-        <tr className="border-t border-zinc-200 font-semibold"><td className="pt-1">Cost per Hire</td><td className="pt-1 text-right">{lakhs(hc.total)}</td><td className="pt-1 pl-3 text-right text-xs text-zinc-500">{rupees(hc.total)}</td></tr>
+        <tr className="border-t border-line font-semibold"><td className="pt-1">Cost per Hire</td><td className="pt-1 text-right">{lakhs(hc.total)}</td><td className="pt-1 pl-3 text-right text-xs text-subtle">{rupees(hc.total)}</td></tr>
       </tbody>
     </table>
   );
@@ -145,7 +145,7 @@ export function HireCostDialog({ app, open, onOpenChange, onDone }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" data-testid="hire-cost-dialog">
         <DialogHeader><DialogTitle>Recruitment cost · {app.candidate_name}</DialogTitle>
-          <p className="text-xs text-zinc-500">{app.code} · {app.requisition_title}</p></DialogHeader>
+          <p className="text-xs text-subtle">{app.code} · {app.requisition_title}</p></DialogHeader>
         <HireCostPanel app={app} onSaved={onDone} />
       </DialogContent>
     </Dialog>

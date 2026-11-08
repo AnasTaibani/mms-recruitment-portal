@@ -19,7 +19,7 @@ export default function UsersPage() {
   const roles = Object.entries(meta.roles).filter(([k]) => k !== "super_admin" || can("users.super")).map(([value, label]) => ({ value, label: `${label} — ${DESC[value]}` }));
   const save = async (fn, msg) => { try { await fn(); toast.success(msg); setDlg(null); reload(); reloadRef(); } catch (e) { toast.error(errMsg(e)); } };
   const cols = [
-    { key: "name", label: "Name", render: (u) => <span className="font-medium text-zinc-900">{u.name}</span> },
+    { key: "name", label: "Name", render: (u) => <span className="font-medium text-ink">{u.name}</span> },
     { key: "email", label: "Email" },
     { key: "role_label", label: "Role" },
     { key: "designation", label: "Designation" },

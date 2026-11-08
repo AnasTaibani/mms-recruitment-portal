@@ -39,7 +39,7 @@ export default function Requisitions() {
   const flt = (k, opts, ph) => <SelectField value={f[k]} onChange={(v) => setF({ ...f, [k]: v })} options={opts} placeholder={ph} testid={`req-filter-${k}`} className="w-40" />;
   const cols = [
     { key: "code", label: "Req ID", render: (r) => <span className="font-mono text-xs">{r.code}</span> },
-    { key: "title", label: "Job Title", render: (r) => <span className="font-medium text-zinc-900">{r.title}</span> },
+    { key: "title", label: "Job Title", render: (r) => <span className="font-medium text-ink">{r.title}</span> },
     { key: "department", label: "Department" },
     { key: "hiring_manager", label: "Hiring Manager" },
     { key: "recruiter", label: "Recruiter" },

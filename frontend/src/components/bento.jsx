@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BRAND, NEUTRAL, STATUS } from "@/lib/brand";
 
-/* Bento dashboard primitives — neutral palette (matte black / off-white / greys), colour only for outcomes. */
-export const INK = "#18181B";
-export const TONE = { up: "#3F7D58", down: "#B4534B", warn: "#B7791F", muted: "#A8A29E" };
-export const SERIES = { added: "#18181B", shortlisted: "#78716C", interviews_completed: "#A8A29E", offers_released: "#B7791F", joined: "#3F7D58" };
+/* Bento dashboard primitives in the MMS design system (white cards, brand-blue accents, IBM Plex Sans). */
+export const TONE = { up: STATUS.positive, down: STATUS.negative, warn: STATUS.warning, muted: NEUTRAL.grey };
+// trend series: primary → secondary → supporting; Joined (a positive outcome) in muted green
+export const SERIES = { added: BRAND.deep, shortlisted: BRAND.royal, interviews_completed: BRAND.blue, offers_released: BRAND.sky, joined: STATUS.positive };
 export const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 export function useReducedMotion() {
@@ -30,18 +31,17 @@ export function useMounted() {
   return on;
 }
 
-/** Animated number (ease-out), respects reduced motion. `format` turns the number into display text. */
-export function CountUp({ value, format = (v) => Math.round(v).toLocaleString("en-IN"), duration = 1100, className, testid }) {
+/** Animated number (ease-out), respects reduced motion. */
+export function CountUp({ value, format = (v) => Math.round(v).toLocaleString("en-IN"), duration = 1000, className, testid }) {
   const reduced = useReducedMotion();
   const [v, setV] = useState(reduced || value == null ? value : 0);
   useEffect(() => {
     if (value == null || reduced) { setV(value); return undefined; }
     let raf = 0;
-    const from = 0;
     const t0 = performance.now();
     const tick = (now) => {
       const p = Math.min(1, (now - t0) / duration);
-      setV(from + (value - from) * (1 - Math.pow(1 - p, 4)));
+      setV(value * (1 - Math.pow(1 - p, 4)));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -50,33 +50,37 @@ export function CountUp({ value, format = (v) => Math.round(v).toLocaleString("e
   return <span className={cn("tabular-nums", className)} data-testid={testid}>{value == null ? "—" : format(v)}</span>;
 }
 
-export function Tile({ title, action, className, children, testid, pad = true, href }) {
-  const body = (
+/** Card shell: white surface, light-grey border, 16px radius, minimal shadow, 15px semibold heading. */
+export function Tile({ title, info, action, className, children, testid }) {
+  return (
     <section data-testid={testid}
-      className={cn("group/tile relative flex min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#E7E5E4] bg-white text-[#18181B] shadow-[0_1px_2px_rgba(24,24,27,0.04)] transition-[box-shadow,border-color] duration-300 hover:border-[#D6D3D1] hover:shadow-[0_18px_40px_-28px_rgba(24,24,27,0.45)]",
-        pad && "p-5", className)}>
+      className={cn("relative flex min-w-0 flex-col rounded-2xl border border-line bg-white p-5 text-ink shadow-[0_1px_2px_rgba(32,36,43,0.04)] transition-[box-shadow,border-color] duration-200 hover:border-[#DCE2E9] hover:shadow-[0_10px_28px_-20px_rgba(34,101,200,0.45)] sm:p-6", className)}>
       {(title || action) && (
         <header className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          {title && <h3 className="min-w-0 text-[13px] font-medium text-zinc-500">{title}</h3>}
+          {title && (
+            <h3 className="flex min-w-0 items-center gap-1.5 text-[16px] font-semibold text-ink">
+              {title}
+              {info && <span title={info} className="cursor-help text-[#AEB5BF] hover:text-brand-royal"><Info className="h-4 w-4" strokeWidth={1.8} /></span>}
+            </h3>
+          )}
           {action}
         </header>
       )}
       {children}
     </section>
   );
-  return href ? <Link to={href} className="contents">{body}</Link> : body;
 }
 
-export function Pills({ value, options, onChange, label, testid, size = "sm" }) {
+/** Segmented toggle (Weekly / Monthly etc.): pale-blue selected state with deep-blue text. */
+export function Pills({ value, options, onChange, label, testid }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex flex-wrap rounded-full border border-[#E7E5E4] bg-white p-0.5" data-testid={testid}>
+    <div role="radiogroup" aria-label={label} className="inline-flex flex-wrap rounded-[10px] border border-line bg-white p-0.5" data-testid={testid}>
       {options.map((o) => {
         const [v, l] = Array.isArray(o) ? o : [o, o];
         return (
           <button key={v} type="button" role="radio" aria-checked={v === value} onClick={() => onChange(v)} data-testid={testid ? `${testid}-${v}` : undefined}
-            className={cn("rounded-full font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400",
-              size === "sm" ? "px-2.5 py-1 font-mono text-[11px]" : "px-3.5 py-1.5 text-[12.5px]",
-              v === value ? "bg-[#18181B] text-white" : "text-zinc-500 hover:text-[#18181B]")}>
+            className={cn("rounded-[8px] px-3 py-1 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-royal/40",
+              v === value ? "bg-brand-pale text-brand-deep" : "text-subtle hover:text-ink")}>
             {l}
           </button>
         );
@@ -87,18 +91,18 @@ export function Pills({ value, options, onChange, label, testid, size = "sm" }) 
 
 /** Change vs the previous period. null → "—" (no comparable data); never invented. */
 export function Delta({ pct, className }) {
-  if (pct === null || pct === undefined) return <span className={cn("font-mono text-[11px] text-zinc-400", className)} title="No data in the previous period to compare with">—</span>;
-  const up = pct >= 0;
+  if (pct === null || pct === undefined) return <span className={cn("text-[12px] text-[#AEB5BF]", className)} title="No data in the previous period to compare with">—</span>;
+  const up = pct > 0, flat = pct === 0;
   return (
-    <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums", className)}
-      style={{ color: up ? TONE.up : TONE.down, background: up ? "rgba(63,125,88,0.09)" : "rgba(180,83,75,0.09)" }}>
-      {up ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
+    <span className={cn("inline-flex items-center gap-0.5 text-[12px] font-medium tabular-nums", className)}
+      style={{ color: flat ? NEUTRAL.subtle : up ? STATUS.positive : STATUS.negative }}>
+      {flat ? "—" : up ? "↑" : "↓"} {flat ? "0%" : `${up ? "+" : "−"}${Math.abs(pct).toFixed(0)}%`}
     </span>
   );
 }
 
-/** Horizontal segmented bar with hover focus (like the reference's allocation bar). */
-export function SegBar({ items, height = 36, colorOf, onSelect, testid }) {
+/** Horizontal segmented bar with hover focus. */
+export function SegBar({ items, height = 32, colorOf, onSelect, testid }) {
   const mounted = useMounted();
   const [hover, setHover] = useState(null);
   const total = items.reduce((s, x) => s + x.value, 0);
@@ -108,10 +112,10 @@ export function SegBar({ items, height = 36, colorOf, onSelect, testid }) {
       {items.filter((x) => x.value > 0).map((x, i) => (
         <button key={x.key} type="button" title={`${x.label}: ${x.value}`} aria-label={`${x.label}: ${x.value}`}
           onPointerEnter={() => setHover(x.key)} onFocus={() => setHover(x.key)} onClick={() => onSelect?.(x)}
-          className={cn("min-w-[6px] rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400", onSelect ? "cursor-pointer" : "cursor-default")}
+          className={cn("min-w-[6px] rounded-[6px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-royal/40", onSelect ? "cursor-pointer" : "cursor-default")}
           style={{ flexBasis: mounted ? `${(x.value / total) * 100}%` : `${100 / items.length}%`, flexGrow: 0, flexShrink: 1,
-            background: colorOf(x, i), opacity: hover === null || hover === x.key ? 1 : 0.3,
-            transition: `flex-basis 900ms ${EASE} ${120 + i * 50}ms, opacity 200ms ease` }} />
+            background: colorOf(x, i), opacity: hover === null || hover === x.key ? 1 : 0.35,
+            transition: `flex-basis 800ms ${EASE} ${100 + i * 40}ms, opacity 180ms ease` }} />
       ))}
     </div>
   );
@@ -120,12 +124,12 @@ export function SegBar({ items, height = 36, colorOf, onSelect, testid }) {
 export function ChartTip({ active, payload, label, labelFormat = (l) => l, valueFormat = (v) => v }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-[#E7E5E4] bg-white/95 px-3 py-2 text-xs shadow-[0_12px_30px_-16px_rgba(24,24,27,0.5)] backdrop-blur">
-      <p className="mb-1 font-mono text-[11px] text-zinc-500">{labelFormat(label)}</p>
+    <div className="rounded-[10px] border border-line bg-white px-3 py-2 text-[12px] shadow-[0_12px_30px_-14px_rgba(32,36,43,0.35)]">
+      <p className="mb-1 font-medium text-ink">{labelFormat(label)}</p>
       {payload.filter((p) => p.value !== null && p.value !== undefined).map((p) => (
-        <p key={p.dataKey} className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-zinc-600"><i className="h-2 w-2 rounded-full" style={{ background: p.color || p.stroke }} />{p.name}</span>
-          <b className="font-mono tabular-nums text-[#18181B]">{valueFormat(p.value, p)}</b>
+        <p key={p.dataKey} className="flex items-center justify-between gap-5">
+          <span className="flex items-center gap-1.5 text-subtle"><i className="h-2 w-2 rounded-full" style={{ background: p.color || p.stroke || p.payload?.fill }} />{p.name}</span>
+          <b className="font-semibold tabular-nums text-ink">{valueFormat(p.value, p)}</b>
         </p>
       ))}
     </div>
@@ -133,7 +137,7 @@ export function ChartTip({ active, payload, label, labelFormat = (l) => l, value
 }
 
 export function Unavailable({ children = "Not enough data for this period", className }) {
-  return <div className={cn("flex flex-1 items-center justify-center rounded-2xl border border-dashed border-[#E7E5E4] px-4 py-8 text-center text-xs text-zinc-400", className)}>{children}</div>;
+  return <div className={cn("flex flex-1 items-center justify-center rounded-xl border border-dashed border-line bg-canvas/60 px-4 py-8 text-center text-[13px] text-subtle", className)}>{children}</div>;
 }
 
 export const bucketLabel = (k, gran) => {

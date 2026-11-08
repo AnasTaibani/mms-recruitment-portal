@@ -68,8 +68,8 @@ export function StageWizard({ app, target, open, onClose, onDone, focus }) {
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl" data-testid="stage-wizard">
         <DialogHeader>
           <DialogTitle>Complete stages · move to “{target}”</DialogTitle>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-            <span className="font-medium text-zinc-800" data-testid="wizard-candidate">{app.candidate_name}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
+            <span className="font-medium text-ink" data-testid="wizard-candidate">{app.candidate_name}</span>
             <span>{rd?.code || app.code}</span>
             <span className="flex items-center gap-1">Current <StatusBadge status={rd?.current || app.status} /></span>
             <ArrowRight className="h-3 w-3" />
@@ -77,12 +77,12 @@ export function StageWizard({ app, target, open, onClose, onDone, focus }) {
           </div>
         </DialogHeader>
 
-        {!rd ? <div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-zinc-400" /></div> : finished ? (
+        {!rd ? <div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-[#9AA2AE]" /></div> : finished ? (
           <Finished rd={finished} onClose={close} />
         ) : (
           <>
             <div className="space-y-1.5">
-              <div className="flex justify-between text-xs text-zinc-500"><span>{doneCount} of {blocking.length} required stage(s) complete</span>
+              <div className="flex justify-between text-xs text-subtle"><span>{doneCount} of {blocking.length} required stage(s) complete</span>
                 {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}</div>
               <Progress value={blocking.length ? (doneCount * 100) / blocking.length : 100} data-testid="wizard-progress" />
             </div>
@@ -97,17 +97,17 @@ export function StageWizard({ app, target, open, onClose, onDone, focus }) {
                   <li key={s.key}>
                     <button type="button" onClick={() => setIdx(i)} data-testid={`wizard-step-${s.key}`}
                       className={cn("flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors", i === idx ? "bg-zinc-900/5 font-medium" : "hover:bg-zinc-900/[0.03]")}>
-                      {s.done ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : s.blocking ? <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /> : <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />}
-                      <span>{s.stage}{!s.blocking && <span className="block text-[11px] font-normal text-zinc-400">not blocking</span>}{s.legacy && <span className="block text-[11px] font-normal text-zinc-400">historical record</span>}</span>
+                      {s.done ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : s.blocking ? <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" /> : <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#9AA2AE]" />}
+                      <span>{s.stage}{!s.blocking && <span className="block text-[11px] font-normal text-[#9AA2AE]">not blocking</span>}{s.legacy && <span className="block text-[11px] font-normal text-[#9AA2AE]">historical record</span>}</span>
                     </button>
                   </li>
                 ))}
                 <li><button type="button" onClick={() => setIdx(steps.length)} data-testid="wizard-step-summary"
                   className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm", atSummary ? "bg-zinc-900/5 font-medium" : "hover:bg-zinc-900/[0.03]")}>
-                  <ArrowRight className="h-4 w-4 text-zinc-500" />Summary &amp; confirm</button></li>
+                  <ArrowRight className="h-4 w-4 text-subtle" />Summary &amp; confirm</button></li>
               </ol>
 
-              <div className="min-h-[260px] rounded-xl border border-zinc-200/80 bg-white/60 p-4">
+              <div className="min-h-[260px] rounded-xl border border-line/80 bg-white/60 p-4">
                 {atSummary
                   ? <Summary rd={rd} app={app} target={target} user={user} onMoved={async () => {
                       setChanged(true);
@@ -117,8 +117,8 @@ export function StageWizard({ app, target, open, onClose, onDone, focus }) {
                   : <StepPanel step={step} app={app} rd={rd} user={user} can={can} onSaved={saved} />}
               </div>
             </div>
-            <div className="flex items-center justify-between border-t border-zinc-200/70 pt-3">
-              <p className="text-[11px] text-zinc-500">Each saved stage is kept as its own record — you can close and continue later.</p>
+            <div className="flex items-center justify-between border-t border-line/70 pt-3">
+              <p className="text-[11px] text-subtle">Each saved stage is kept as its own record — you can close and continue later.</p>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={close} data-testid="wizard-cancel"><X className="mr-1 h-4 w-4" />Cancel</Button>
                 <Button variant="outline" disabled={idx === 0} onClick={() => setIdx(idx - 1)} data-testid="wizard-back"><ArrowLeft className="mr-1 h-4 w-4" />Back</Button>
@@ -136,10 +136,10 @@ function Missing({ step }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-zinc-900">{step.stage}</h3>
+        <h3 className="text-base font-semibold text-ink">{step.stage}</h3>
         <StatusBadge status={step.done ? "Complete" : step.blocking ? "Missing" : "Optional"} tone={step.done ? "green" : step.blocking ? "amber" : "zinc"} />
       </div>
-      <p className="text-sm text-zinc-600" data-testid="wizard-step-summary-text">{step.summary}</p>
+      <p className="text-sm text-[#4B5361]" data-testid="wizard-step-summary-text">{step.summary}</p>
       {!step.done && step.missing.length > 0 && (
         <ul className="list-disc space-y-0.5 pl-5 text-xs text-amber-800" data-testid="wizard-missing">{step.missing.map((m) => <li key={m}>Missing: {m}</li>)}</ul>
       )}
@@ -218,14 +218,14 @@ function InterviewStep({ step, app, user, can, onSaved }) {
         {can("interview.manage") && <Button size="sm" onClick={() => setDlg({ kind: "schedule" })} data-testid="wizard-schedule">Schedule a round</Button>}
       </div>
       {ivs.length > 0 && (
-        <div className="divide-y divide-zinc-200/70 rounded-lg border border-zinc-200/70" data-testid="wizard-interviews">
+        <div className="divide-y divide-zinc-200/70 rounded-lg border border-line/70" data-testid="wizard-interviews">
           {[...ivs].sort((a, b) => (a.round_number || 0) - (b.round_number || 0)).map((iv) => {
             const pending = iv.feedback_pending || [];
             return (
               <div key={iv.id} className="space-y-2 p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">Round {iv.round_number} · {iv.round_name}</span>
-                  <span className="text-xs text-zinc-500">{iv.date}</span>
+                  <span className="text-xs text-subtle">{iv.date}</span>
                   <StatusBadge status={iv.status} /><StatusBadge status={`Feedback ${iv.feedback_status}`} tone="zinc" />
                   {iv.outcome && iv.outcome !== "Pending" && <StatusBadge status={iv.outcome} />}
                 </div>
@@ -270,7 +270,7 @@ function InterviewStep({ step, app, user, can, onSaved }) {
 /* ---- Selection ---- */
 function SelectionStep({ step, app, can, onSaved }) {
   const [open, setOpen] = useState(false);
-  if (step.done || !can("selection.decide")) return step.done ? null : <p className="text-xs text-zinc-500">You do not have permission to record selection decisions.</p>;
+  if (step.done || !can("selection.decide")) return step.done ? null : <p className="text-xs text-subtle">You do not have permission to record selection decisions.</p>;
   return (
     <>
       <Button onClick={() => setOpen(true)} data-testid="wizard-record-selection">Record selection decision</Button>
@@ -304,11 +304,11 @@ function OfferStep({ step, app, rd, can, onSaved }) {
   return (
     <div className="space-y-3">
       {offers.length > 0 && (
-        <div className="flex flex-wrap gap-2 text-xs text-zinc-600">{offers.map((o) => <span key={o.id} className="rounded-md border border-zinc-200 px-2 py-1">{o.code} · ₹{o.ctc} L · {o.status}</span>)}</div>
+        <div className="flex flex-wrap gap-2 text-xs text-[#4B5361]">{offers.map((o) => <span key={o.id} className="rounded-md border border-line px-2 py-1">{o.code} · ₹{o.ctc} L · {o.status}</span>)}</div>
       )}
       {!current && can("offer.manage") && <Button onClick={() => setCreate(true)} data-testid="wizard-create-offer">{offers.length ? "Create re-offer" : "Create offer"}</Button>}
       {current && !enough && (
-        <div className="space-y-3 rounded-lg border border-zinc-200/70 p-3 text-sm">
+        <div className="space-y-3 rounded-lg border border-line/70 p-3 text-sm">
           <p className="font-medium">{current.code} is <StatusBadge status={current.status} /></p>
           {current.status === "Draft" && can("offer.manage") && <Button size="sm" onClick={() => act("submit")} data-testid="wizard-offer-submit">Submit for approval</Button>}
           {current.status === "Approval Pending" && (can("offer.approve") ? (
@@ -316,7 +316,7 @@ function OfferStep({ step, app, rd, can, onSaved }) {
               <Button size="sm" onClick={() => act("approve")} data-testid="wizard-offer-approve">Approve</Button>
               <Input className="h-8 w-60 text-xs" placeholder="Reason (to reject)" value={reason} onChange={(e) => setReason(e.target.value)} />
               <Button size="sm" variant="outline" disabled={!reason.trim()} onClick={() => act("reject", { reason })}>Reject</Button>
-            </div>) : <p className="text-xs text-zinc-500">Waiting for an approver.</p>)}
+            </div>) : <p className="text-xs text-subtle">Waiting for an approver.</p>)}
           {["Approved", "Released"].includes(current.status) && can("offer.manage") && (
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="space-y-1"><Label className="text-xs">{current.status === "Approved" ? "Release date" : "Acceptance date"} *</Label>
@@ -354,7 +354,7 @@ function JoiningStep({ step, app, can, onSaved }) {
   if (step.done) return null;
   if (!j) return (
     <div className="space-y-2 text-sm">
-      <p className="text-zinc-600">The joining record is created when the offer is accepted.</p>
+      <p className="text-[#4B5361]">The joining record is created when the offer is accepted.</p>
       {app.status === "Offer Accepted" && can("joining.manage") && (
         <div className="flex items-end gap-2">
           <div className="space-y-1"><Label className="text-xs">Tentative joining date</Label><Input type="date" value={tentative} onChange={(e) => setTentative(e.target.value)} /></div>
@@ -365,10 +365,10 @@ function JoiningStep({ step, app, can, onSaved }) {
   );
   const got = (j.checklist || []).filter((c) => c.received).length;
   return (
-    <div className="space-y-1 text-sm text-zinc-600" data-testid="wizard-joining-info">
+    <div className="space-y-1 text-sm text-[#4B5361]" data-testid="wizard-joining-info">
       <p>{j.code} · {j.status}{j.tentative_date && ` · tentative ${j.tentative_date}`}{j.confirmed_date && ` · confirmed ${j.confirmed_date}`}</p>
       <p>Document checklist: {got}/{(j.checklist || []).length} received ({j.checklist_status || "—"}) — manage it on the Joining page.</p>
-      <p className="text-xs text-zinc-500">Enter the actual date of joining on the summary step to complete the move.</p>
+      <p className="text-xs text-subtle">Enter the actual date of joining on the summary step to complete the move.</p>
     </div>
   );
 }
@@ -395,11 +395,11 @@ function Summary({ rd, app, target, user, onMoved }) {
   };
   return (
     <div className="space-y-4" data-testid="wizard-summary">
-      <h3 className="text-base font-semibold text-zinc-900">Summary</h3>
+      <h3 className="text-base font-semibold text-ink">Summary</h3>
       <ul className="space-y-1.5 text-sm">
         {rd.steps.map((s) => (
           <li key={s.key} className="flex items-start gap-2">
-            {s.done ? <Check className="mt-0.5 h-4 w-4 text-emerald-600" /> : <CircleDashed className={cn("mt-0.5 h-4 w-4", s.blocking ? "text-amber-600" : "text-zinc-400")} />}
+            {s.done ? <Check className="mt-0.5 h-4 w-4 text-emerald-600" /> : <CircleDashed className={cn("mt-0.5 h-4 w-4", s.blocking ? "text-amber-600" : "text-[#9AA2AE]")} />}
             <span><span className="font-medium">{s.stage}:</span> {s.summary}</span>
           </li>
         ))}

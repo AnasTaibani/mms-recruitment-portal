@@ -37,7 +37,7 @@ function JoinSheet({ j, onClose, onChanged }) {
   return (
     <Sheet open={!!j} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg" data-testid="joining-detail">
-        <SheetHeader><p className="font-mono text-[11px] text-zinc-400">{j.code}</p><SheetTitle>{j.candidate_name}</SheetTitle><p className="text-sm text-zinc-500">{j.requisition_title} · Recruiter {j.recruiter || "—"}{j.partner && ` · ${j.partner}`}</p></SheetHeader>
+        <SheetHeader><p className="font-mono text-[11px] text-[#9AA2AE]">{j.code}</p><SheetTitle>{j.candidate_name}</SheetTitle><p className="text-sm text-subtle">{j.requisition_title} · Recruiter {j.recruiter || "—"}{j.partner && ` · ${j.partner}`}</p></SheetHeader>
         <div className="my-4"><StatusBadge status={j.status} testid="join-status" /></div>
         <div className="grid grid-cols-2 gap-3">
           {d("tentative_date", "Tentative joining date")}{d("confirmed_date", "Confirmed joining date")}{d("actual_date", "Actual date of joining")}
@@ -49,7 +49,7 @@ function JoinSheet({ j, onClose, onChanged }) {
         <div className="space-y-2">{(v.checklist || []).map((c, i) => (
           <label key={c.item} className="flex items-center gap-2 text-sm"><Checkbox disabled={!can("joining.manage")} checked={c.received} data-testid={`join-doc-${i}`}
             onCheckedChange={(x) => setV({ ...v, checklist: v.checklist.map((y, k) => (k === i ? { ...y, received: !!x } : y)) })} />{c.item}</label>))}
-          {!v.checklist?.length && <p className="text-xs text-zinc-400">No checklist items. Configure them under Master Data → Joining Document Checklist.</p>}</div>
+          {!v.checklist?.length && <p className="text-xs text-[#9AA2AE]">No checklist items. Configure them under Master Data → Joining Document Checklist.</p>}</div>
         <div className="mt-4 space-y-1"><Label className="text-xs">Onboarding remarks</Label><Textarea rows={3} disabled={!can("joining.manage")} value={v.remarks} onChange={(e) => setV({ ...v, remarks: e.target.value })} data-testid="join-remarks" /></div>
         {can("joining.manage") && <Button className="mt-4 w-full" onClick={save} disabled={busy} data-testid="join-save">{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save changes</Button>}
         <h4 className="eyebrow mb-2 mt-6">History</h4>
@@ -67,7 +67,7 @@ export default function Joining() {
   const cur = sel && (data || []).find((x) => x.id === sel);
   const cols = [
     { key: "code", label: "ID", render: (j) => <span className="font-mono text-xs">{j.code}</span> },
-    { key: "candidate_name", label: "Candidate", render: (j) => <span className="font-medium text-zinc-900">{j.candidate_name}</span> },
+    { key: "candidate_name", label: "Candidate", render: (j) => <span className="font-medium text-ink">{j.candidate_name}</span> },
     { key: "requisition_title", label: "Role" },
     { key: "recruiter", label: "Recruiter" },
     { key: "partner", label: "Partner" },

@@ -24,7 +24,7 @@ export default function Candidates() {
   const range = [["min_exp", "Min exp (yrs)"], ["max_exp", "Max exp (yrs)"], ["min_ctc", "Min current CTC"], ["max_ctc", "Max current CTC"], ["min_ectc", "Min expected CTC"], ["max_ectc", "Max expected CTC"], ["max_notice", "Max notice (days)"]];
   const cols = [
     { key: "code", label: "ID", render: (c) => <span className="font-mono text-xs">{c.code}</span> },
-    { key: "name", label: "Name", render: (c) => <span className="font-medium text-zinc-900">{c.name}</span> },
+    { key: "name", label: "Name", render: (c) => <span className="font-medium text-ink">{c.name}</span> },
     { key: "email", label: "Email" },
     { key: "phone", label: "Mobile" },
     { key: "current_company", label: "Company" },
@@ -56,7 +56,7 @@ export default function Candidates() {
           <Popover>
             <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9" data-testid="cand-more-filters"><SlidersHorizontal className="mr-1.5 h-4 w-4" />Experience, CTC & notice</Button></PopoverTrigger>
             <PopoverContent className="grid w-72 grid-cols-2 gap-2">
-              {range.map(([k, l]) => <div key={k}><p className="mb-1 text-[11px] text-zinc-500">{l}</p><Input type="number" className="h-8" value={f[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-testid={`cand-filter-${k}`} /></div>)}
+              {range.map(([k, l]) => <div key={k}><p className="mb-1 text-[11px] text-subtle">{l}</p><Input type="number" className="h-8" value={f[k] || ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-testid={`cand-filter-${k}`} /></div>)}
               <Button variant="ghost" size="sm" className="col-span-2" onClick={() => setF({})}>Clear all filters</Button>
             </PopoverContent>
           </Popover>

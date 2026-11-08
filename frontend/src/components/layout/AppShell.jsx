@@ -35,20 +35,24 @@ export const NAV = [
 function SideNav({ collapsed, onNavigate }) {
   const { can } = useAuth();
   return (
-    <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 scroll-thin">
+    <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5 scroll-thin">
       {NAV.map((g) => {
         const items = g.items.filter((i) => !i.perm || can(i.perm));
         if (!items.length) return null;
         return (
           <div key={g.group}>
-            {!collapsed && <p className="eyebrow mb-2 px-2 text-[10px]">{g.group}</p>}
+            {!collapsed ? <p className="mb-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-[#8A929E]">{g.group}</p>
+              : <div className="mx-auto mb-2 h-px w-6 bg-line" />}
             <div className="space-y-0.5">
               {items.map(({ to, label, icon: Icon }) => (
                 <NavLink key={to} to={to} end={to === "/"} onClick={onNavigate} title={label} data-testid={`nav-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`}
-                  className={({ isActive }) => cn("flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-                    isActive ? "bg-gradient-to-r from-[#18181B] to-[#3F3F46] text-white shadow-md shadow-[#18181B]/25" : "text-zinc-600 hover:bg-[#F4F4F3] hover:text-[#18181B]", collapsed && "justify-center")}>
-                  <Icon className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-                  {!collapsed && <span className="truncate">{label}</span>}
+                  className={({ isActive }) => cn("group/nav relative flex h-10 items-center gap-3 rounded-[10px] px-3 text-[14px] font-medium transition-colors duration-150",
+                    isActive ? "bg-brand-pale text-brand-deep" : "text-ink hover:bg-[#F3F6FA]", collapsed && "justify-center px-0")}>
+                  {({ isActive }) => (<>
+                    {isActive && <span className="absolute -left-3 top-2 h-6 w-[3px] rounded-r-full bg-brand-deep" />}
+                    <Icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-brand-deep" : "text-subtle group-hover/nav:text-ink")} strokeWidth={1.8} />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                  </>)}
                 </NavLink>
               ))}
             </div>
@@ -61,13 +65,13 @@ function SideNav({ collapsed, onNavigate }) {
 
 function Brand({ collapsed }) {
   return (
-    <Link to="/" className="flex h-20 items-center border-b border-zinc-200 px-4">
+    <Link to="/" className="flex h-[76px] items-center border-b border-line px-5">
       {collapsed ? (
         <img src="/mms-mark.png" alt="MetaMorphoSys Technologies" className="mx-auto h-9 w-9 object-contain" />
       ) : (
         <div className="w-full leading-tight">
-          <img src="/mms-logo.png" alt="MetaMorphoSys Technologies" className="h-11 w-auto max-w-full object-contain" />
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Recruitment Portal</p>
+          <img src="/mms-logo.png" alt="MetaMorphoSys Technologies" className="h-10 w-auto max-w-[190px] object-contain" />
+          <p className="mt-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[#8A929E]">Recruitment Portal</p>
         </div>
       )}
     </Link>
@@ -85,21 +89,21 @@ function Notifications() {
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" data-testid="notifications-btn">
           <Bell className="h-[18px] w-[18px]" />
-          {data.unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#18181B] px-1 text-[9px] font-bold text-white" data-testid="notifications-count">{data.unread}</span>}
+          {data.unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-deep px-1 text-[10px] font-semibold text-white ring-2 ring-white" data-testid="notifications-count">{data.unread > 99 ? "99+" : data.unread}</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[360px] p-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="text-sm font-semibold">Notifications</p>
-          <button className="text-xs text-zinc-500 hover:text-zinc-900" onClick={async () => { await api.post("/notifications/read-all"); load(); }} data-testid="notifications-read-all">Mark all read</button>
+          <button className="text-xs text-subtle hover:text-ink" onClick={async () => { await api.post("/notifications/read-all"); load(); }} data-testid="notifications-read-all">Mark all read</button>
         </div>
         <div className="max-h-96 overflow-y-auto">
-          {!data.items.length && <p className="p-6 text-center text-sm text-zinc-400">You're all caught up.</p>}
+          {!data.items.length && <p className="p-6 text-center text-sm text-[#9AA2AE]">You're all caught up.</p>}
           {data.items.map((n) => (
-            <button key={n.id} onClick={() => open(n)} className={cn("block w-full border-b border-zinc-100 px-4 py-3 text-left hover:bg-zinc-50", !n.read && "bg-amber-50/40")} data-testid="notification-item">
-              <p className="text-sm font-medium text-zinc-900">{!n.read && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-500 align-middle" />}{n.title}</p>
-              <p className="text-xs text-zinc-600">{n.message}</p>
-              <p className="mt-0.5 text-[10px] text-zinc-400">{fmtDateTime(n.created_at)}</p>
+            <button key={n.id} onClick={() => open(n)} className={cn("block w-full border-b border-[#EEF1F5] px-4 py-3 text-left hover:bg-canvas", !n.read && "bg-brand-mist")} data-testid="notification-item">
+              <p className="text-sm font-medium text-ink">{!n.read && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-brand-deep align-middle" />}{n.title}</p>
+              <p className="text-xs text-[#4B5361]">{n.message}</p>
+              <p className="mt-0.5 text-[10px] text-[#9AA2AE]">{fmtDateTime(n.created_at)}</p>
             </button>
           ))}
         </div>
@@ -128,11 +132,11 @@ export default function AppShell() {
   const initials = user.name.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-[#F7F6F3] via-[#FAFAF9] to-[#F4F4F3]">
-      <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r border-zinc-200 bg-white transition-[width] duration-200 lg:flex", collapsed ? "w-[72px]" : "w-64")} data-testid="sidebar">
+    <div className="flex min-h-screen bg-canvas">
+      <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-white transition-[width] duration-200 lg:flex", collapsed ? "w-[76px]" : "w-[248px]")} data-testid="sidebar">
         <Brand collapsed={collapsed} />
         <SideNav collapsed={collapsed} />
-        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 border-t border-zinc-200 px-5 py-3 text-xs text-zinc-500 hover:text-zinc-900" data-testid="sidebar-toggle">
+        <button onClick={() => setCollapsed(!collapsed)} className={cn("flex h-12 items-center gap-2 border-t border-line px-6 text-[13px] text-subtle transition-colors hover:text-brand-deep", collapsed && "justify-center px-0")} data-testid="sidebar-toggle">
           <ChevronsLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />{!collapsed && "Collapse"}
         </button>
       </aside>
@@ -140,25 +144,25 @@ export default function AppShell() {
         <SheetContent side="left" className="flex w-72 flex-col p-0"><Brand /><SideNav onNavigate={() => setMobile(false)} /></SheetContent>
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-20 items-center gap-3 border-b border-zinc-200 bg-white/85 px-4 backdrop-blur-md sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-line bg-white/90 px-4 backdrop-blur-md sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobile(true)} data-testid="mobile-menu-btn"><Menu className="h-5 w-5" /></Button>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-900" data-testid="topbar-title">{parts[1].label}</p>
-            <div className="hidden items-center gap-1 text-[11px] text-zinc-400 sm:flex" data-testid="breadcrumbs">
-              <span>MMS</span>{parts.map((p, i) => <span key={i}>/ {p.to && i < parts.length - 1 ? <Link to={p.to} className="hover:text-zinc-700">{p.label}</Link> : p.label}</span>)}
+            <p className="truncate text-[15px] font-semibold text-ink sm:hidden" data-testid="topbar-title">{parts[1].label}</p>
+            <div className="hidden items-center gap-1.5 text-[12px] text-subtle sm:flex" data-testid="breadcrumbs">
+              <span>MMS</span>{parts.map((p, i) => <span key={i} className="flex items-center gap-1.5"><span className="text-[#C6CDD6]">/</span>{p.to && i < parts.length - 1 ? <Link to={p.to} className="hover:text-brand-deep">{p.label}</Link> : <span className={cn(i === parts.length - 1 && "font-medium text-ink")}>{p.label}</span>}</span>)}
             </div>
           </div>
           <div className="ml-auto flex items-center gap-1">
             <Notifications />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-zinc-100" data-testid="user-menu-btn">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#18181B] text-[11px] font-bold text-white">{initials}</span>
-                  <span className="hidden text-left leading-tight sm:block"><span className="block text-xs font-semibold text-zinc-900">{user.name}</span><span className="block text-[10px] text-zinc-500">{user.role_label}</span></span>
+                <button className="flex items-center gap-2.5 rounded-[10px] py-1 pl-1 pr-2 transition-colors hover:bg-[#F3F6FA]" data-testid="user-menu-btn">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-deep text-[12px] font-semibold text-white">{initials}</span>
+                  <span className="hidden text-left leading-tight sm:block"><span className="block text-[13px] font-semibold text-ink">{user.name}</span><span className="block text-[12px] text-subtle">{user.designation || user.role_label}</span></span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel className="text-xs font-normal text-zinc-500">{user.email}</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs font-normal text-subtle">{user.email}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => nav("/profile")} data-testid="menu-profile"><UserCircle className="mr-2 h-4 w-4" />My profile</DropdownMenuItem>
                 <DropdownMenuItem onClick={async () => { await logout(); nav("/login"); }} data-testid="menu-logout"><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem>
@@ -166,7 +170,7 @@ export default function AppShell() {
             </DropdownMenu>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"><Outlet /></main>
+        <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-7"><Outlet /></main>
       </div>
     </div>
   );

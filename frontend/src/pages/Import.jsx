@@ -50,14 +50,14 @@ function Templates() {
   const sorted = (data || []).slice().sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
   return (
     <Section title="Step 1 — Download a template" testid="import-templates">
-      <p className="mb-4 text-xs text-zinc-500">Each workbook has an <b>Instructions</b> sheet, dropdowns from your master data, date checks (DD-MM-YYYY) and a yellow sample row that is never imported. Black headers marked * are mandatory. Import in the order shown so later templates can refer to earlier records.</p>
+      <p className="mb-4 text-xs text-subtle">Each workbook has an <b>Instructions</b> sheet, dropdowns from your master data, date checks (DD-MM-YYYY) and a yellow sample row that is never imported. Black headers marked * are mandatory. Import in the order shown so later templates can refer to earlier records.</p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {sorted.map((t, i) => (
-          <div key={t.key} className="flex flex-col justify-between rounded-lg border border-zinc-200 p-3" data-testid={`template-${t.key}`}>
+          <div key={t.key} className="flex flex-col justify-between rounded-lg border border-line p-3" data-testid={`template-${t.key}`}>
             <div>
               <p className="eyebrow">Template {i + 1}</p>
-              <p className="mt-1 text-sm font-semibold text-zinc-900">{t.title}</p>
-              <p className="mt-1 text-[11px] text-zinc-500">{t.columns.length} columns · {t.columns.filter((c) => c.required).length} mandatory</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{t.title}</p>
+              <p className="mt-1 text-[11px] text-subtle">{t.columns.length} columns · {t.columns.filter((c) => c.required).length} mandatory</p>
             </div>
             <Button size="sm" variant="outline" className="mt-3" disabled={busy === t.key} onClick={() => get(t.key)} data-testid={`template-download-${t.key}`}>
               {busy === t.key ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}Download .xlsx
@@ -122,12 +122,12 @@ export default function ImportPage() {
         {step === 0 && <Templates />}
 
         <div>
-          <div className="mb-4 flex flex-wrap gap-2">{STEPS.map((x, i) => <span key={x} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", i === step ? "border-[#18181B] bg-[#18181B] text-white" : i < step ? "border-zinc-300 bg-white text-zinc-700" : "border-zinc-200 text-zinc-400")}>{i + 1}. {x}</span>)}</div>
+          <div className="mb-4 flex flex-wrap gap-2">{STEPS.map((x, i) => <span key={x} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", i === step ? "border-brand-deep bg-brand-deep text-white" : i < step ? "border-[#D5DBE3] bg-white text-[#3A414C]" : "border-line text-[#9AA2AE]")}>{i + 1}. {x}</span>)}</div>
 
           {step === 0 && (
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-white py-14 hover:border-zinc-500" data-testid="import-dropzone">
-              {busy ? <Loader2 className="h-8 w-8 animate-spin text-zinc-400" /> : <FileSpreadsheet className="h-10 w-10 text-zinc-400" strokeWidth={1.4} />}
-              <p className="text-sm font-semibold">Step 2 — Upload the completed .xlsx file</p><p className="text-xs text-zinc-500">Portal templates are recognised automatically. Older MMS workbooks can still be mapped column by column.</p>
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[#D5DBE3] bg-white py-14 hover:border-zinc-500" data-testid="import-dropzone">
+              {busy ? <Loader2 className="h-8 w-8 animate-spin text-[#9AA2AE]" /> : <FileSpreadsheet className="h-10 w-10 text-[#9AA2AE]" strokeWidth={1.4} />}
+              <p className="text-sm font-semibold">Step 2 — Upload the completed .xlsx file</p><p className="text-xs text-subtle">Portal templates are recognised automatically. Older MMS workbooks can still be mapped column by column.</p>
               <input type="file" accept=".xlsx,.xlsm" hidden onChange={(e) => { upload(e.target.files[0]); e.target.value = ""; }} data-testid="import-file-input" />
             </label>
           )}
@@ -140,16 +140,16 @@ export default function ImportPage() {
                   <div className="space-y-1 sm:col-span-2"><Label className="text-xs">Import as</Label><SelectField value={type} onChange={(v) => { setType(v); setMapping(v === sh?.template ? sh.suggested_mapping : {}); setVal(null); }} options={TYPES} placeholder="Choose import type" testid="import-type" /></div>
                 </div>
                 {sh?.template && <p className="mt-3 flex items-center gap-2 text-xs text-emerald-700" data-testid="import-template-detected"><CheckCircle2 className="h-4 w-4" />Recognised as the {TYPES.find((t) => t.value === sh.template)?.label} template — columns are mapped automatically.</p>}
-                {sh && <div className="scroll-thin mt-4 overflow-x-auto rounded-lg border" data-testid="import-preview"><table className="text-xs"><thead><tr className="bg-zinc-50"><th className="px-3 py-2 text-left font-semibold text-zinc-400">Row</th>{sh.headers.map((h) => <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-semibold">{h}</th>)}</tr></thead>
-                  <tbody>{sh.preview.map((r, i) => <tr key={i} className={cn("border-t", r.some((c) => String(c ?? "").includes("[SAMPLE]")) && "bg-amber-50 text-amber-800")}><td className="px-3 py-1.5 text-zinc-400">{sh.header_row + i + 2}</td>{r.map((c, k) => <td key={k} className="whitespace-nowrap px-3 py-1.5 text-zinc-600">{c === null ? "" : String(c)}</td>)}</tr>)}</tbody></table></div>}
-                {sh && <p className="mt-2 text-[11px] text-zinc-400">Showing the first {sh.preview.length} of {sh.row_count} rows.</p>}
+                {sh && <div className="scroll-thin mt-4 overflow-x-auto rounded-lg border" data-testid="import-preview"><table className="text-xs"><thead><tr className="bg-canvas"><th className="px-3 py-2 text-left font-semibold text-[#9AA2AE]">Row</th>{sh.headers.map((h) => <th key={h} className="whitespace-nowrap px-3 py-2 text-left font-semibold">{h}</th>)}</tr></thead>
+                  <tbody>{sh.preview.map((r, i) => <tr key={i} className={cn("border-t", r.some((c) => String(c ?? "").includes("[SAMPLE]")) && "bg-amber-50 text-amber-800")}><td className="px-3 py-1.5 text-[#9AA2AE]">{sh.header_row + i + 2}</td>{r.map((c, k) => <td key={k} className="whitespace-nowrap px-3 py-1.5 text-[#4B5361]">{c === null ? "" : String(c)}</td>)}</tr>)}</tbody></table></div>}
+                {sh && <p className="mt-2 text-[11px] text-[#9AA2AE]">Showing the first {sh.preview.length} of {sh.row_count} rows.</p>}
               </Section>
 
               {type && type !== "interviewers" && (
                 <Section title="Options" testid="import-options">
                   <div className="flex flex-col gap-3">
-                    <label className="flex items-start gap-2 text-sm"><Switch checked={opts.update_existing} onCheckedChange={(c) => setOpt("update_existing", c)} data-testid="import-update-existing" /><span><b>Update existing records (overwrite)</b><span className="block text-xs text-zinc-500">Off by default. When off, rows that match an existing record (same ID, email or mobile) are skipped as duplicates. When on, the filled-in columns replace the values in the portal.</span></span></label>
-                    <label className="flex items-start gap-2 text-sm"><Switch checked={opts.create_missing_masters} onCheckedChange={(c) => setOpt("create_missing_masters", c)} data-testid="import-create-masters" /><span><b>Add unknown values to master data</b><span className="block text-xs text-zinc-500">Off by default. When off, a department, recruiter, role or partner that is not in Master Data is reported as an error.</span></span></label>
+                    <label className="flex items-start gap-2 text-sm"><Switch checked={opts.update_existing} onCheckedChange={(c) => setOpt("update_existing", c)} data-testid="import-update-existing" /><span><b>Update existing records (overwrite)</b><span className="block text-xs text-subtle">Off by default. When off, rows that match an existing record (same ID, email or mobile) are skipped as duplicates. When on, the filled-in columns replace the values in the portal.</span></span></label>
+                    <label className="flex items-start gap-2 text-sm"><Switch checked={opts.create_missing_masters} onCheckedChange={(c) => setOpt("create_missing_masters", c)} data-testid="import-create-masters" /><span><b>Add unknown values to master data</b><span className="block text-xs text-subtle">Off by default. When off, a department, recruiter, role or partner that is not in Master Data is reported as an error.</span></span></label>
                     {type === "candidates" && legacy && <label className="flex items-center gap-2 text-sm"><Switch checked={opts.create_missing_roles} onCheckedChange={(c) => setOpt("create_missing_roles", c)} data-testid="import-create-roles" />Create requisitions for unmatched roles (legacy workbook)</label>}
                     {type === "candidates" && legacy && <label className="flex items-center gap-2 text-sm"><Switch checked={!opts.skip_duplicates} onCheckedChange={(c) => setOpt("skip_duplicates", !c)} data-testid="import-link-duplicates" />Link duplicates to existing candidates (adds new applications)</label>}
                   </div>
@@ -159,7 +159,7 @@ export default function ImportPage() {
 
               {type && type !== "interviewers" && (
                 <Section title="Column mapping" testid="import-mapping" actions={sh?.template && <Button size="sm" variant="ghost" onClick={() => setShowMap(!showMap)} data-testid="import-toggle-mapping">{showMap ? "Hide" : "Review"} mapping</Button>}>
-                  {!showMap ? <p className="text-xs text-zinc-500">{Object.values(mapping).filter(Boolean).length} of {Object.keys(batch.fields[type]).length} fields mapped to the template columns.</p> : (
+                  {!showMap ? <p className="text-xs text-subtle">{Object.values(mapping).filter(Boolean).length} of {Object.keys(batch.fields[type]).length} fields mapped to the template columns.</p> : (
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {Object.entries(batch.fields[type]).map(([k, l]) => (
                         <div key={k} className="space-y-1"><Label className="text-xs">{l}{batch.required[type]?.includes(k) && <span className="text-rose-600"> *</span>}</Label>
@@ -167,7 +167,7 @@ export default function ImportPage() {
                     </div>)}
                 </Section>
               )}
-              {type === "interviewers" && <p className="text-sm text-zinc-500">Each column header becomes the interviewer's skill area; every name below it is imported once.</p>}
+              {type === "interviewers" && <p className="text-sm text-subtle">Each column header becomes the interviewer's skill area; every name below it is imported once.</p>}
               <div className="flex gap-2"><Button variant="outline" onClick={reset}>Back</Button><Button disabled={!type || busy} onClick={validate} data-testid="import-validate-btn">{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}Validate</Button></div>
             </div>
           )}
@@ -187,9 +187,9 @@ export default function ImportPage() {
                 toolbar={<SelectField value={show} onChange={(v) => setShow(v || "all")} allowNone={false} options={[{ value: "all", label: "All rows" }, { value: "error", label: "Errors" }, { value: "duplicate", label: "Duplicates" }, { value: "valid", label: "Ready" }, { value: "update", label: "Will update" }, { value: "sample", label: "Sample rows" }, { value: "warn", label: "With messages" }]} testid="import-row-filter" className="w-40" />}
                 columns={[{ key: "row", label: "Excel row" }, { key: "status", label: "Result", value: (r) => STATUS_LABEL[r.status], render: (r) => <StatusBadge status={STATUS_LABEL[r.status]} tone={{ valid: "green", update: "plum", duplicate: "amber", error: "rose", sample: "zinc" }[r.status]} /> },
                   { key: "name", label: "Record", value: (r) => recordLabel(type, r.data) },
-                  { key: "extra", label: "Details", value: (r) => recordDetails(type, r.data), className: "text-xs text-zinc-500" },
+                  { key: "extra", label: "Details", value: (r) => recordDetails(type, r.data), className: "text-xs text-subtle" },
                   { key: "cols", label: "Columns with errors", value: (r) => (r.error_columns || []).map((c) => c.replace(/[*†]$/, "")).join(", "), className: "text-xs font-medium text-rose-700" },
-                  { key: "messages", label: "Messages", value: (r) => r.messages.join("; "), className: "text-xs text-zinc-700" }]} />
+                  { key: "messages", label: "Messages", value: (r) => r.messages.join("; "), className: "text-xs text-[#3A414C]" }]} />
               {s.error > 0 && (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" data-testid="import-error-note">
                   <p className="font-semibold">{s.error} row(s) have errors and will not be imported.</p>
@@ -201,7 +201,7 @@ export default function ImportPage() {
                 {val.report_rows > 0 && <Button variant="outline" onClick={() => download(`/import/${batch.id}/rejected`).catch((e) => toast.error(errMsg(e)))} data-testid="import-download-errors"><Download className="mr-2 h-4 w-4" />Download error report ({val.report_rows} rows)</Button>}
                 <Button disabled={busy || !canCommit} onClick={commit} data-testid="import-commit-btn">{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}<Upload className="mr-2 h-4 w-4" />Confirm import of {importable} row(s)</Button>
               </div>
-              <p className="text-xs text-zinc-500">The file is validated again when you confirm. If anything fails while saving, the whole import is rolled back.</p>
+              <p className="text-xs text-subtle">The file is validated again when you confirm. If anything fails while saving, the whole import is rolled back.</p>
             </div>
           )}
 
@@ -215,7 +215,7 @@ export default function ImportPage() {
                 <Kpi label="Duplicate records" value={res.duplicates} accent="text-amber-700" testid="import-result-duplicates" />
                 <Kpi label="Failed records" value={res.failed} accent="text-rose-700" testid="import-result-failed" />
               </div>
-              {res.applications > 0 && <p className="mt-3 text-xs text-zinc-500">{res.applications} application(s) were created from the legacy role column.</p>}
+              {res.applications > 0 && <p className="mt-3 text-xs text-subtle">{res.applications} application(s) were created from the legacy role column.</p>}
               <div className="mt-4 flex flex-wrap gap-2">
                 {res.rejected_count > 0 && <Button variant="outline" onClick={() => download(`/import/${batch.id}/rejected`)} data-testid="import-download-rejected"><Download className="mr-2 h-4 w-4" />Download {res.rejected_count} rejected rows</Button>}
                 <Button variant="outline" onClick={() => { setStep(1); setVal(null); setRes(null); }} data-testid="import-another-sheet">Import another sheet</Button>

@@ -1,52 +1,74 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* IBM Plex Sans — self-hosted (SIL OFL, see src/assets/fonts/ibm-plex-sans/OFL-LICENSE.txt). The only font family in the portal. */
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 400; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 500; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 600; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 700; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 400; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-ext-400-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 500; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-ext-500-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 600; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-ext-600-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-display: swap; font-weight: 700; src: url('./assets/fonts/ibm-plex-sans/ibm-plex-sans-latin-ext-700-normal.woff2') format('woff2'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------
+   MMS design tokens — taken from the MetaMorphoSys logo.
+   Sky #A0D5FC · Brand #67B5F4 · Royal #4089DE · Deep #2265C8
+   White #FFFFFF · Off-white #F7F8FA · Light grey #E8EBEF · Charcoal #20242B · Muted #737B87
+   (the same values live in tailwind.config.js → colors.brand / ink / subtle / line / canvas, and src/lib/brand.js for charts)
+   --------------------------------------------------------------- */
 @layer base {
     :root {
-        --background: 40 14% 97%;            /* off-white #F8F7F5 */
-        --foreground: 240 6% 10%;             /* matte black #18181B */
+        --background: 220 23% 97%;            /* off-white #F7F8FA */
+        --foreground: 218 15% 15%;            /* charcoal #20242B */
         --card: 0 0% 100%;
-        --card-foreground: 240 6% 10%;
+        --card-foreground: 218 15% 15%;
         --popover: 0 0% 100%;
-        --popover-foreground: 240 6% 10%;
-        --primary: 240 6% 10%;                /* matte black – buttons, switches, checkboxes */
+        --popover-foreground: 218 15% 15%;
+        --primary: 216 71% 46%;               /* deep blue #2265C8 – primary buttons, switches, checkboxes */
         --primary-foreground: 0 0% 100%;
-        --secondary: 30 6% 94%;
-        --secondary-foreground: 240 6% 10%;
-        --muted: 30 8% 95%;
-        --muted-foreground: 240 4% 46%;
-        --accent: 30 8% 94%;                  /* hover backgrounds */
-        --accent-foreground: 240 6% 10%;
-        --destructive: 0 72% 51%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 30 6% 89%;
-        --input: 30 6% 86%;
-        --ring: 240 4% 46%;                   /* focus outline */
-        --radius: 0.75rem;
+        --secondary: 214 18% 95%;
+        --secondary-foreground: 218 15% 15%;
+        --muted: 214 20% 96%;
+        --muted-foreground: 216 8% 49%;       /* muted grey #737B87 */
+        --accent: 212 90% 96%;                /* pale blue hover / selected #EDF5FE */
+        --accent-foreground: 216 71% 46%;
+        --destructive: 2 55% 50%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 214 18% 92%;                /* light grey #E8EBEF */
+        --input: 213 17% 87%;
+        --ring: 212 71% 56%;                  /* royal blue #4089DE */
+        --radius: 0.625rem;                   /* 10px controls; cards use rounded-2xl (16px) */
     }
 }
 
 @layer base {
     * { @apply border-border; }
+    html { font-size: 14px; }
     body {
         @apply bg-background text-foreground;
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
         -webkit-font-smoothing: antialiased;
+        font-feature-settings: "kern";
     }
-    ::selection { background: #18181B; color: #fff; }
+    h1, h2, h3, h4 { letter-spacing: -0.01em; }
+    ::selection { background: #A0D5FC; color: #20242B; }
+    input, select, textarea, button { font-family: inherit; }
 }
 
-.font-mono, code { font-family: 'JetBrains Mono', monospace; }
-.eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500; }
+/* numbers (KPIs, CTC, costs, tables): same family, tabular figures — no second font */
+.font-mono, code, .tabular-nums { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.eyebrow { @apply text-[12px] font-medium text-[#737B87]; }
 .fade-up { animation: fadeUp .35s ease both; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 8px; }
-.recharts-wrapper text { font-family: 'Plus Jakarta Sans', sans-serif; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #D5DBE3; border-radius: 8px; }
+.recharts-wrapper text { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
 
-/* the login page keeps its own blue look (unchanged) */
+/* the login page keeps its own look (not redesigned) */
 .login-theme { --primary: 216 75% 46%; --ring: 216 75% 46%; --background: 216 60% 98%; --border: 214 32% 90%; --input: 214 32% 88%; }
 
 [data-debug-wrapper="true"] { display: contents !important; }

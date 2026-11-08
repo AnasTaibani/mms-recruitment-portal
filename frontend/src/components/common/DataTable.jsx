@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 export function EmptyState({ title = "Nothing here yet", hint, action }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-14 text-center" data-testid="empty-state">
-      <Inbox className="h-8 w-8 text-zinc-300" strokeWidth={1.5} />
-      <p className="text-sm font-semibold text-zinc-800">{title}</p>
-      {hint && <p className="max-w-sm text-xs text-zinc-500">{hint}</p>}
+      <Inbox className="h-8 w-8 text-[#C6CDD6]" strokeWidth={1.5} />
+      <p className="text-sm font-semibold text-ink">{title}</p>
+      {hint && <p className="max-w-sm text-xs text-subtle">{hint}</p>}
       {action}
     </div>
   );
@@ -49,12 +49,14 @@ export function DataTable({ columns, data, loading, onRowClick, testid = "table"
   const visible = columns.filter((c) => !hidden.has(c.key));
   const slice = rows.slice(cur * pageSize, cur * pageSize + pageSize);
   const toggleSort = (k) => setSort((s) => ({ key: k, dir: s.key === k ? -s.dir : 1 }));
+  // numeric columns (counts, CTC, costs, days) right-align with tabular figures
+  const isNum = (c) => c.align === "right" || (c.align !== "left" && !c.render && slice.length > 0 && slice.every((r) => { const v = val(r, c); return v === null || v === undefined || typeof v === "number"; }) && slice.some((r) => typeof val(r, c) === "number"));
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white" data-testid={testid}>
-      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 p-3">
+    <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(32,36,43,0.04)]" data-testid={testid}>
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
         <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[#9AA2AE]" />
           <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} placeholder={searchPlaceholder} className="h-9 pl-8" data-testid={`${testid}-search`} />
         </div>
         {toolbar}
@@ -75,13 +77,14 @@ export function DataTable({ columns, data, loading, onRowClick, testid = "table"
         </DropdownMenu>
       </div>
       <div className="scroll-thin overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-[13.5px]">
           <thead>
-            <tr className="border-b border-zinc-100 bg-zinc-50/60">
-              {visible.map((c) => (
+            <tr className="border-b border-line bg-canvas">
+              {visible.map((c, ci) => (
                 <th key={c.key} onClick={() => c.sortable !== false && toggleSort(c.key)}
-                  className={cn("whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-500", c.sortable !== false && "cursor-pointer select-none hover:text-zinc-900")}>
-                  <span className="inline-flex items-center gap-1">{c.label}{sort.key === c.key && (sort.dir > 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}</span>
+                  className={cn("whitespace-nowrap px-4 py-2.5 text-left text-[12px] font-medium text-subtle", isNum(c) && "text-right", ci === 0 && "sticky left-0 z-[1] bg-canvas",
+                    c.sortable !== false && "cursor-pointer select-none hover:text-ink")}>
+                  <span className={cn("inline-flex items-center gap-1", isNum(c) && "flex-row-reverse")}>{c.label}{sort.key === c.key && (sort.dir > 0 ? <ArrowUp className="h-3 w-3 text-brand-deep" /> : <ArrowDown className="h-3 w-3 text-brand-deep" />)}</span>
                 </th>
               ))}
             </tr>
@@ -92,9 +95,10 @@ export function DataTable({ columns, data, loading, onRowClick, testid = "table"
             ))}
             {!loading && slice.map((row, i) => (
               <tr key={row.id || i} onClick={() => onRowClick?.(row)} data-testid={`${testid}-row-${row.code || row.id || i}`}
-                className={cn("border-b border-zinc-100 transition-colors last:border-0", onRowClick && "cursor-pointer hover:bg-zinc-50", rowClass?.(row))}>
-                {visible.map((c) => (
-                  <td key={c.key} className={cn("px-4 py-3 align-middle text-zinc-700", c.className)}>{c.render ? c.render(row) : (val(row, c) ?? <span className="text-zinc-300">—</span>)}</td>
+                className={cn("group/row border-b border-[#EEF1F5] transition-colors last:border-0 hover:bg-[#F7FAFF]", onRowClick && "cursor-pointer", rowClass?.(row))}>
+                {visible.map((c, ci) => (
+                  <td key={c.key} title={typeof val(row, c) === "string" && val(row, c).length > 40 ? val(row, c) : undefined}
+                    className={cn("px-4 py-2.5 align-middle text-[#3A414C]", !c.wrap && "max-w-[320px] overflow-hidden text-ellipsis whitespace-nowrap", isNum(c) && "text-right tabular-nums", ci === 0 && "sticky left-0 bg-white font-medium text-ink group-hover/row:bg-[#F7FAFF]", c.className)}>{c.render ? c.render(row) : (val(row, c) ?? <span className="text-[#C6CDD6]">—</span>)}</td>
                 ))}
               </tr>
             ))}
@@ -102,7 +106,7 @@ export function DataTable({ columns, data, loading, onRowClick, testid = "table"
         </table>
         {!loading && !rows.length && <EmptyState title={emptyTitle || (q ? "No matching records" : "No records yet")} hint={emptyHint} />}
       </div>
-      <div className="flex items-center justify-between border-t border-zinc-100 px-4 py-2.5 text-xs text-zinc-500">
+      <div className="flex items-center justify-between border-t border-line px-4 py-2.5 text-[12px] text-subtle">
         <span data-testid={`${testid}-count`}>{rows.length} record{rows.length === 1 ? "" : "s"}</span>
         <div className="flex items-center gap-2">
           <span>Page {cur + 1} of {pages}</span>

@@ -18,13 +18,13 @@ import { cn } from "@/lib/utils";
 function Card({ a, onDone }) {
   return (
     <div draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", a.id)} data-testid={`kanban-card-${a.code}`}
-      className={cn("cursor-grab rounded-lg border bg-white p-3 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-shadow hover:shadow-md active:cursor-grabbing", a.stuck ? "border-amber-300" : "border-zinc-200")}>
+      className={cn("cursor-grab rounded-lg border bg-white p-3 shadow-[0_1px_0_rgba(0,0,0,0.03)] transition-shadow hover:shadow-md active:cursor-grabbing", a.stuck ? "border-amber-300" : "border-line")}>
       <div className="flex items-start justify-between gap-2">
-        <Link to={`/candidates/${a.candidate_id}`} className="text-sm font-semibold text-zinc-900 hover:underline">{a.candidate_name}</Link>
+        <Link to={`/candidates/${a.candidate_id}`} className="text-sm font-semibold text-ink hover:underline">{a.candidate_name}</Link>
         <AppActions app={a} onDone={onDone} />
       </div>
-      <p className="truncate text-xs text-zinc-500">{a.requisition_title}</p>
-      <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-400">
+      <p className="truncate text-xs text-subtle">{a.requisition_title}</p>
+      <div className="mt-2 flex items-center justify-between text-[11px] text-[#9AA2AE]">
         <span>{a.recruiter || "Unassigned"}</span>
         <span className={cn(a.stuck && "flex items-center gap-1 font-semibold text-amber-700")}>{a.stuck && <AlertTriangle className="h-3 w-3" />}{a.days_in_stage}d</span>
       </div>
@@ -53,9 +53,9 @@ function Board({ apps, reload }) {
           const term = meta.terminal.includes(s);
           return (
             <div key={s} onDragOver={(e) => { e.preventDefault(); setOver(s); }} onDragLeave={() => setOver(null)} onDrop={(e) => drop(s, e)} data-testid={`kanban-col-${s.toLowerCase().replace(/ /g, "-")}`}
-              className={cn("flex w-64 shrink-0 flex-col rounded-xl border p-2 transition-colors", term ? "border-zinc-200 bg-zinc-100/60" : "border-zinc-200 bg-zinc-50", over === s && "border-[#18181B] bg-zinc-100")}>
+              className={cn("flex w-64 shrink-0 flex-col rounded-xl border p-2 transition-colors", term ? "border-line bg-[#EEF1F5]/60" : "border-line bg-canvas", over === s && "border-brand-deep bg-[#EEF1F5]")}>
               <div className="mb-2 flex items-center justify-between px-1.5 py-1">
-                <StatusBadge status={s} /><span className="text-xs font-semibold text-zinc-500">{items.length}</span>
+                <StatusBadge status={s} /><span className="text-xs font-semibold text-subtle">{items.length}</span>
               </div>
               <div className="min-h-[120px] space-y-2">{items.map((a) => <Card key={a.id} a={a} onDone={reload} />)}</div>
             </div>
@@ -95,7 +95,7 @@ export default function Pipeline() {
       <PageHeader eyebrow="Recruitment" title="Pipeline" description="Drag cards between stages. Rejections, withdrawals and holds require a reason."
         actions={<>
           {can("reports.export") && <Button variant="outline" onClick={() => download("/reports/pipeline", f)} data-testid="pipe-export-btn"><Download className="mr-2 h-4 w-4" />Export</Button>}
-          <div className="flex rounded-lg border border-zinc-200 bg-white p-0.5">
+          <div className="flex rounded-lg border border-line bg-white p-0.5">
             <Button size="sm" variant={view === "board" ? "default" : "ghost"} onClick={() => setView("board")} data-testid="pipe-view-board"><KanbanSquare className="mr-1.5 h-4 w-4" />Board</Button>
             <Button size="sm" variant={view === "table" ? "default" : "ghost"} onClick={() => setView("table")} data-testid="pipe-view-table"><Table2 className="mr-1.5 h-4 w-4" />Table</Button>
           </div>
@@ -109,7 +109,7 @@ export default function Pipeline() {
           ...[...meta.pipeline, ...meta.terminal].map((s) => ({ value: s, label: s }))], "All stages")}
         {stuck > 0 && <span className="ml-auto flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800" data-testid="stuck-alert"><AlertTriangle className="h-3.5 w-3.5" />{stuck} stuck over {meta.settings.stale_days} days</span>}
       </div>
-      {loading ? <p className="text-sm text-zinc-400">Loading pipeline…</p> : view === "board" ? <Board apps={apps} reload={reload} /> : <DataTable testid="pipe-table" columns={cols} data={apps} />}
+      {loading ? <p className="text-sm text-[#9AA2AE]">Loading pipeline…</p> : view === "board" ? <Board apps={apps} reload={reload} /> : <DataTable testid="pipe-table" columns={cols} data={apps} />}
     </div>
   );
 }

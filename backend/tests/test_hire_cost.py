@@ -43,8 +43,8 @@ def to_offer_accepted(a, name, ctc=6):
     """New candidate taken to Offer Accepted through real records (screening, shortlisting, audited waiver, selection, offer)."""
     c = ok(a.post(f"{API}/candidates", json={"name": f"TEST_HC_{name}_{TAG}", "email": f"hc_{name.lower()}_{TAG}@mms.test", "requisition_id": S["req"], "force": True}))
     aid = next(x["id"] for x in ok(a.get(f"{API}/applications", params={"requisition_id": S["req"]})) if x["candidate_id"] == c["id"])
-    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(20), "owner": "HR", "decision": "Cleared"}))
-    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(19), "owner": "HM", "decision": "Shortlisted"}))
+    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(20), "owner": "TEST_Screener", "decision": "Cleared"}))
+    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(19), "owner": "TEST_Screener", "decision": "Shortlisted"}))
     ok(a.post(f"{API}/applications/{aid}/interview-waiver", json={"reason": "Test: interviews covered elsewhere"}))
     ok(a.post(f"{API}/selections", json={"application_id": aid, "decision": "Selected", "selection_date": D(10), "decision_maker": "CTO",
                                          "compensation": ctc, "approval_status": "Approved"}))
@@ -67,6 +67,7 @@ def app_of(a, aid):
 
 
 def test_00_setup(admin):
+    admin.post(f"{API}/masters", json={"type": "recruiter", "name": "TEST_Screener"})  # screening owner / reviewer must be a recruiter
     for role, key in (("recruiter", "rec"), ("management", "mgmt"), ("interviewer", "iv")):
         S[f"email_{key}"] = f"hc_{key}_{TAG}@mms.test"
         ok(admin.post(f"{API}/users", json={"email": S[f"email_{key}"], "name": f"TEST_hc_{key}_{TAG}", "role": role, "password": PW}))

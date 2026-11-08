@@ -39,6 +39,7 @@ def denied(r):
 
 
 def test_00_setup(admin):
+    admin.post(f"{API}/masters", json={"type": "recruiter", "name": "TEST_Screener"})  # screening owner / reviewer must be a recruiter
     for role, key, desig in (("management", "mg", "VP Engineering"), ("management", "mg2", "CFO"), ("interviewer", "iv", "Tech Lead"), ("recruiter", "rec", "HR")):
         S[f"email_{key}"] = f"mi_{key}_{TAG}@mms.test"
         S[f"user_{key}"] = ok(admin.post(f"{API}/users", json={"email": S[f"email_{key}"], "name": f"TEST_mi_{key}_{TAG}", "role": role,
@@ -53,8 +54,8 @@ def test_00_setup(admin):
     for n in ("one", "two"):
         c = ok(admin.post(f"{API}/candidates", json={"name": f"TEST_MI {n} {TAG}", "email": f"mi_{n}_{TAG}@mms.test", "requisition_id": S["req"], "force": True}))
         aid = next(x["id"] for x in ok(admin.get(f"{API}/applications", params={"requisition_id": S["req"]})) if x["candidate_id"] == c["id"])
-        ok(admin.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(5), "owner": "HR", "decision": "Cleared"}))
-        ok(admin.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(5), "owner": "HM", "decision": "Shortlisted"}))
+        ok(admin.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(5), "owner": "TEST_Screener", "decision": "Cleared"}))
+        ok(admin.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(5), "owner": "TEST_Screener", "decision": "Shortlisted"}))
         S[f"cand_{n}"], S[f"app_{n}"] = c["id"], aid
 
 
@@ -113,7 +114,7 @@ def test_05_restrictions(admin):
     denied(mg.put(f"{API}/candidates/{S['cand_one']}", json={"name": "Changed"}))
     denied(mg.post(f"{API}/candidates", json={"name": "x", "email": f"x_{TAG}@mms.test"}))
     denied(mg.post(f"{API}/applications/{S['app_one']}/status", json={"status": "Interview Completed"}))
-    denied(mg.post(f"{API}/applications/{S['app_one']}/stage-reviews", json={"stage": "Screening", "date": D(1), "owner": "x", "decision": "Cleared"}))
+    denied(mg.post(f"{API}/applications/{S['app_one']}/stage-reviews", json={"stage": "Screening", "date": D(1), "owner": "TEST_Screener", "decision": "Cleared"}))
     denied(mg.post(f"{API}/interviews/{S['iv_mine']}/status", json={"status": "Completed"}))  # status changes stay with Recruiters
     denied(mg.post(f"{API}/interviews", json={"application_id": S["app_one"], "round_name": "x", "date": D(1), "interviewer_ids": [S["m_mg"]["id"]]}))
     denied(mg.post(f"{API}/selections", json={"application_id": S["app_one"], "decision": "Selected", "selection_date": D(1), "decision_maker": "x"}))

@@ -529,6 +529,10 @@ async def add_stage_review(aid: str, body: StageReviewIn, user=Depends(require("
     if not body.date or not (body.owner or "").strip() or body.decision not in SCREENING_DECISIONS[body.stage]:
         raise HTTPException(400, f"{body.stage} date, {'owner' if body.stage == 'Screening' else 'reviewer'} and decision ({' / '.join(SCREENING_DECISIONS[body.stage])}) are required")
     not_future(body.date, f"{body.stage} date")
+    owner = await db.masters.find_one({"type": "recruiter", "active": {"$ne": False},
+                                       "name": {"$regex": f"^{re.escape(body.owner.strip())}$", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1})
+    if not owner:
+        raise HTTPException(400, f"{'Screening owner' if body.stage == 'Screening' else 'Reviewer'} must be one of the recruiters in Master Data")
     passed = body.decision in ("Cleared", "Shortlisted")
     if not passed and not (body.remarks or "").strip():
         raise HTTPException(400, "Remarks are required when rejecting or holding")
@@ -536,7 +540,7 @@ async def add_stage_review(aid: str, body: StageReviewIn, user=Depends(require("
         await assert_prerequisites(app, "Shortlisted", keys={"screening"})
     ts = now_iso()
     doc = {"id": new_id(), "application_id": aid, "candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"],
-           "stage": body.stage, "date": body.date, "owner": body.owner.strip(), "decision": body.decision, "remarks": body.remarks or "",
+           "stage": body.stage, "date": body.date, "owner": owner["name"], "owner_id": owner["id"], "decision": body.decision, "remarks": body.remarks or "",
            "active": True, "created_by": user["id"], "created_by_name": user["name"], "created_at": ts}
     await db.stage_reviews.update_many({"application_id": aid, "stage": body.stage, "active": True}, {"$set": {"active": False, "superseded_at": ts}})
     await db.stage_reviews.insert_one(dict(doc))

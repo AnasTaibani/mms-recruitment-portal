@@ -37,6 +37,7 @@ def hero(d, key):
 
 
 def test_00_setup(admin):
+    admin.post(f"{API}/masters", json={"type": "recruiter", "name": "TEST_Screener"})  # screening owner / reviewer must be a recruiter
     dept = ok(admin.post(f"{API}/masters", json={"type": "department", "name": f"TEST_Dash Dept {TAG}"}))
     S["dept"] = dept["id"]
     S["req"] = ok(admin.post(f"{API}/requisitions", json={"title": f"TEST_Dash Role {TAG}", "positions": 3, "crf_date": D(40), "status": "Open", "department_id": dept["id"]}))["id"]
@@ -47,9 +48,9 @@ def test_00_setup(admin):
     for n in range(3):
         c = ok(admin.post(f"{API}/candidates", json={"name": f"TEST_Dash {n} {TAG}", "email": f"dash_{n}_{TAG}@mms.test", "requisition_id": S["req"], "force": True}))
         apps.append(next(x["id"] for x in ok(admin.get(f"{API}/applications", params={"requisition_id": S["req"]})) if x["candidate_id"] == c["id"]))
-    ok(admin.post(f"{API}/applications/{apps[0]}/stage-reviews", json={"stage": "Screening", "date": D(1), "owner": "HR", "decision": "Cleared"}))
-    ok(admin.post(f"{API}/applications/{apps[1]}/stage-reviews", json={"stage": "Screening", "date": D(1), "owner": "HR", "decision": "Cleared"}))
-    ok(admin.post(f"{API}/applications/{apps[1]}/stage-reviews", json={"stage": "Shortlisting", "date": D(1), "owner": "HM", "decision": "Shortlisted"}))
+    ok(admin.post(f"{API}/applications/{apps[0]}/stage-reviews", json={"stage": "Screening", "date": D(1), "owner": "TEST_Screener", "decision": "Cleared"}))
+    ok(admin.post(f"{API}/applications/{apps[1]}/stage-reviews", json={"stage": "Screening", "date": D(1), "owner": "TEST_Screener", "decision": "Cleared"}))
+    ok(admin.post(f"{API}/applications/{apps[1]}/stage-reviews", json={"stage": "Shortlisting", "date": D(1), "owner": "TEST_Screener", "decision": "Shortlisted"}))
     S["apps"] = apps
 
 

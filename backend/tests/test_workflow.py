@@ -58,8 +58,8 @@ def new_cand(a, name, req=None):
 
 
 def screen_and_shortlist(a, aid):
-    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(20), "owner": "Riya (Recruiter)", "decision": "Cleared"}))
-    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(19), "owner": "Hiring panel", "decision": "Shortlisted"}))
+    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(20), "owner": "TEST_Screener", "decision": "Cleared"}))
+    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(19), "owner": "TEST_Screener", "decision": "Shortlisted"}))
 
 
 def interview(a, aid, rnd, n_days, ivrs=None):
@@ -98,6 +98,7 @@ def offer_through(a, aid, until="accept", ctc=18):
 
 # ---------- setup ----------
 def test_00_setup(admin):
+    admin.post(f"{API}/masters", json={"type": "recruiter", "name": "TEST_Screener"})  # screening owner / reviewer must be a recruiter
     for role, key in (("interviewer", "iv1"), ("recruiter", "rec"), ("management", "mgmt")):
         email = f"test_wf_{key}_{TAG}@mms.test"
         ok(admin.post(f"{API}/users", json={"email": email, "name": f"TEST_wf_{key}_{TAG}", "role": role, "password": PW}))
@@ -155,7 +156,7 @@ def test_01_full_progression(admin):
 # 2. Screening -> Joined with everything missing
 def test_02_screening_to_joined_blocked(admin):
     cid, aid = new_cand(admin, "Jumper")
-    ok(admin.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(5), "owner": "Riya", "decision": "Cleared"}))
+    ok(admin.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(5), "owner": "TEST_Screener", "decision": "Cleared"}))
     assert app_of(admin, aid)["status"] == "Screening"
     rd = ok(admin.get(f"{API}/applications/{aid}/readiness", params={"target": "Joined"}))
     missing = {s["key"] for s in rd["steps"] if not s["done"] and s.get("blocking", True)}

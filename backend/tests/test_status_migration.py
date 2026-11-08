@@ -37,10 +37,10 @@ def make(a, name, until):
     aid = next(x["id"] for x in ok(a.get(f"{API}/applications", params={"requisition_id": S["req"]})) if x["candidate_id"] == c["id"])
     if until == "New":
         return c["id"], aid
-    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(20), "owner": "HR", "decision": "Cleared"}))
+    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Screening", "date": D(20), "owner": "TEST_Screener", "decision": "Cleared"}))
     if until == "Screening":
         return c["id"], aid
-    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(19), "owner": "HM", "decision": "Shortlisted"}))
+    ok(a.post(f"{API}/applications/{aid}/stage-reviews", json={"stage": "Shortlisting", "date": D(19), "owner": "TEST_Screener", "decision": "Shortlisted"}))
     ok(a.post(f"{API}/applications/{aid}/interview-waiver", json={"reason": "migration test"}))
     ok(a.post(f"{API}/selections", json={"application_id": aid, "decision": "Selected", "selection_date": D(10), "decision_maker": "CTO", "compensation": 6, "approval_status": "Approved"}))
     o = ok(a.post(f"{API}/offers", json={"application_id": aid, "designation": "Engineer", "ctc": 6, "validity_date": D(-30)}))
@@ -54,6 +54,7 @@ def make(a, name, until):
 
 
 def test_00_setup(admin):
+    admin.post(f"{API}/masters", json={"type": "recruiter", "name": "TEST_Screener"})  # screening owner / reviewer must be a recruiter
     p = ok(admin.get(f"{API}/admin/migrations/joined-to-screening"))
     assert p["environment"] != "production", "refusing to run the migration test against production"
     S["req"] = ok(admin.post(f"{API}/requisitions", json={"title": f"TEST_MIG Role {TAG}", "positions": 5, "crf_date": D(60), "status": "Open"}))["id"]

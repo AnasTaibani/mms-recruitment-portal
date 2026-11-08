@@ -160,11 +160,18 @@ function StepPanel({ step, app, rd, user, can, onSaved }) {
 
 /* ---- Screening / Shortlisting ---- */
 function ReviewStep({ step, app, user, onSaved }) {
+  const { list } = useAuth();
   const [open, setOpen] = useState(false);
   const screening = step.key === "screening";
+  // every active recruiter (Master Data → Recruiters, incl. recruiter user accounts) is selectable
+  const recruiters = list("recruiter").slice().sort((a, b) => a.name.localeCompare(b.name));
+  const names = recruiters.map((r) => r.name);
+  const defaultOwner = [app.recruiter, user.name].find((n) => n && names.includes(n));
   const fields = [
     { name: "date", label: `${step.stage} Date`, type: "date", required: true, max: today() },
-    { name: "owner", label: screening ? "Screening Owner / Recruiter" : "Reviewer", required: true },
+    { name: "owner", label: screening ? "Screening Owner / Recruiter" : "Reviewer (Recruiter)", type: "select", required: true, allowNone: false,
+      placeholder: recruiters.length ? "Select recruiter" : "No recruiters in Master Data",
+      options: recruiters.map((r) => ({ value: r.name, label: r.designation ? `${r.name} — ${r.designation}` : r.name })) },
     { name: "decision", label: "Decision", type: "select", required: true, allowNone: false,
       options: opts(screening ? ["Cleared", "Rejected", "On Hold"] : ["Shortlisted", "Rejected", "On Hold"]) },
     { name: "remarks", label: "Remarks (required when rejecting or holding)", type: "textarea", full: true },
@@ -174,7 +181,7 @@ function ReviewStep({ step, app, user, onSaved }) {
     <>
       <Button onClick={() => setOpen(true)} data-testid={`wizard-record-${step.key}`}>Record {step.stage.toLowerCase()}</Button>
       <FormDialog open={open} onOpenChange={setOpen} title={`Record ${step.stage.toLowerCase()}`} description={`${app.candidate_name} · ${app.code}`}
-        fields={fields} initial={{ date: today(), owner: user.name, decision: screening ? "Cleared" : "Shortlisted" }} testid={`${step.key}-form`} submitLabel="Save & continue"
+        fields={fields} initial={{ date: today(), owner: defaultOwner, decision: screening ? "Cleared" : "Shortlisted" }} testid={`${step.key}-form`} submitLabel="Save & continue"
         onSubmit={async (v) => {
           try {
             await api.post(`/applications/${app.id}/stage-reviews`, { ...v, stage: step.stage });

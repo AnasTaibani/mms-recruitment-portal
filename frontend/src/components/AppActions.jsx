@@ -10,7 +10,8 @@ export const HM_ALLOWED = ["Shortlisted", "CV Rejected", "On Hold", "Interview R
 export function useAllowedMoves() {
   const { meta, can } = useAuth();
   return (status) => {
-    const t = meta.settings.transitions?.[status] || [];
+    // offer decline / revoke are recorded through the offer itself, so they are not offered as plain moves
+    const t = (meta.settings.transitions?.[status] || []).filter((s) => !["Offer Declined", "Offer Revoked"].includes(s));
     if (can("app.move")) return t;
     if (can("app.decide")) return t.filter((s) => HM_ALLOWED.includes(s));
     return [];
@@ -22,7 +23,7 @@ export function AppActions({ app, onDone }) {
   const allowed = useAllowedMoves()(app.status);
   const [move, setMove] = useState(null);
   const [dlg, setDlg] = useState(null);
-  const any = allowed.length || can("interview.manage") || can("selection.decide") || can("offer.manage");
+  const any = allowed.length || can("interview.manage") || can("selection.decide") || can("offer.manage") || can("cost.manage");
   if (!any) return null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
@@ -43,7 +44,8 @@ export function AppActions({ app, onDone }) {
           )}
           {can("interview.manage") && !app.closed && <DropdownMenuItem onClick={() => setDlg("schedule")} data-testid="app-action-schedule">Schedule interview</DropdownMenuItem>}
           {can("selection.decide") && !app.closed && <DropdownMenuItem onClick={() => setDlg("select")} data-testid="app-action-selection">Record selection decision</DropdownMenuItem>}
-          {can("offer.manage") && ["Selected", "Interview Completed", "Offer Declined", "Offer Revoked"].includes(app.status) && <DropdownMenuItem onClick={() => setDlg("offer")} data-testid="app-action-offer">Create offer</DropdownMenuItem>}
+          {can("offer.manage") && ["Selected", "Offer Declined", "Offer Revoked"].includes(app.status) && <DropdownMenuItem onClick={() => setDlg("offer")} data-testid="app-action-offer">{app.status === "Selected" ? "Create offer" : "Create re-offer"}</DropdownMenuItem>}
+          {can("cost.manage") && app.status === "Joined" && <DropdownMenuItem onClick={() => setMove({ app, status: "Joined", focus: "cost" })} data-testid="app-action-cost">Recruitment cost reconciliation{app.cost_status ? ` · ${app.cost_status}` : ""}</DropdownMenuItem>}
         </DropdownMenuContent>
       </DropdownMenu>
       <MoveDialog move={move} onClose={() => setMove(null)} onDone={onDone} />

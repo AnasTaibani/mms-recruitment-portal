@@ -58,13 +58,14 @@ function Transitions() {
   const [t, setT] = useState(meta.settings.transitions || {});
   const [busy, setBusy] = useState(false);
   const flip = (from, to) => setT((x) => ({ ...x, [from]: (x[from] || []).includes(to) ? x[from].filter((s) => s !== to) : [...(x[from] || []), to] }));
-  const save = async () => { setBusy(true); try { await api.put("/settings", { transitions: t }); toast.success("Transitions saved"); reloadRef(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
+  const save = async () => { setBusy(true); try { const { data } = await api.put("/settings", { transitions: t }); setT(data.transitions || {}); toast.success("Transitions saved"); reloadRef(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   return (
     <Section title="Permitted status transitions" actions={<Button size="sm" onClick={save} disabled={busy} data-testid="transitions-save">{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button>}>
-      <p className="mb-3 text-xs text-zinc-500">Rows = current stage, columns = target stage. Automated updates (interviews, offers, joining) are always applied.</p>
+      <p className="mb-3 text-xs text-zinc-500">Rows = current stage, columns = target stage. Only paths in the defined workflow can be switched on (greyed boxes are never allowed); you can switch paths off.
+        Forward moves still need every earlier stage's record — the stage wizard collects them. Joined and closed outcomes cannot be reopened.</p>
       <div className="scroll-thin overflow-auto"><table className="text-[11px]" data-testid="transitions-matrix"><thead><tr><th className="sticky left-0 bg-white p-1 text-left">From \ To</th>{all.map((s) => <th key={s} className="h-28 p-1 align-bottom font-medium"><span className="block w-4 rotate-180 whitespace-nowrap [writing-mode:vertical-rl]">{s}</span></th>)}</tr></thead>
         <tbody>{all.map((from) => <tr key={from} className="border-t border-zinc-100"><td className="sticky left-0 whitespace-nowrap bg-white p-1 pr-3 font-medium">{from}</td>
-          {all.map((to) => <td key={to} className="p-1 text-center">{from === to ? <span className="text-zinc-200">·</span> : <Checkbox checked={(t[from] || []).includes(to)} onCheckedChange={() => flip(from, to)} data-testid={`tr-${from}-${to}`.toLowerCase().replace(/ /g, "-")} />}</td>)}</tr>)}</tbody></table></div>
+          {all.map((to) => <td key={to} className="p-1 text-center">{from === to || !(meta.workflow_matrix?.[from] || []).includes(to) ? <span className="text-zinc-200">·</span> : <Checkbox checked={(t[from] || []).includes(to)} onCheckedChange={() => flip(from, to)} data-testid={`tr-${from}-${to}`.toLowerCase().replace(/ /g, "-")} />}</td>)}</tr>)}</tbody></table></div>
     </Section>
   );
 }

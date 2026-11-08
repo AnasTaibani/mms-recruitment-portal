@@ -103,7 +103,7 @@ export default function Analytics() {
         </TabsContent>
         {d.cost && <TabsContent value="cost" className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
-            <Kpi label="Total hiring cost" value={lakhs(d.cost.total)} hint={`CTC ${lakhs(d.cost.ctc_total)} + fees ${lakhs(d.cost.fees)}`} testid="an-cost-total" /><Kpi label="Candidates joined" value={d.cost.hires} hint="Denominator — actual joiners only" />
+            <Kpi label="Recruitment fees" value={lakhs(d.cost.total)} hint="Recruiter + partner / consultancy fees (CTC excluded)" testid="an-cost-total" /><Kpi label="Candidates joined" value={d.cost.hires} hint="Denominator — actual joiners only" />
             <Kpi label="Cost per hire" value={d.cost.cost_per_hire === null ? "N/A" : lakhs(d.cost.cost_per_hire)} testid="an-cost-per-hire" /><Kpi label="Paid" value={lakhs(d.cost.paid)} />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
@@ -112,8 +112,9 @@ export default function Analytics() {
           </div>
         </TabsContent>}
         <TabsContent value="cycle" className="space-y-4">
+          <p className="text-xs text-zinc-500" data-testid="an-cycle-label">{d.cycle.label || "Recruitment cycle time — not Age per Hire"}. The official KPI is Age per Hire (Actual DOJ − CRF Raised Date).</p>
           <div className="grid gap-3 sm:grid-cols-4">
-            <Kpi label="Avg cycle time" value={num(d.cycle.completed.avg, " d")} hint="Actual DOJ − effective start" testid="an-cycle-avg" /><Kpi label="Median cycle time" value={num(d.cycle.completed.median, " d")} />
+            <Kpi label="Avg cycle time" value={num(d.cycle.completed.avg, " d")} hint="Actual DOJ − earlier of CRF / initiation" testid="an-cycle-avg" /><Kpi label="Median cycle time" value={num(d.cycle.completed.median, " d")} />
             <Kpi label="Avg current age (open)" value={num(d.cycle.current_age.avg, " d")} hint="Today − effective start" /><Kpi label="Median current age" value={num(d.cycle.current_age.median, " d")} />
           </div>
           {d.cycle.missing_join_date > 0 && <p className="text-xs text-amber-700">{d.cycle.missing_join_date} joined candidate(s) have no actual date of joining and are excluded from cycle time.</p>}

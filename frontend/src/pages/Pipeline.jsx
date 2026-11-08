@@ -42,8 +42,7 @@ function Board({ apps, reload }) {
     const a = apps.find((x) => x.id === e.dataTransfer.getData("text/plain"));
     if (!a || a.status === status) return;
     if (!allowed(a.status).includes(status)) { toast.error(`Moving from ${a.status} to ${status} is not permitted`); return; }
-    if (meta.terminal.includes(status) || status === "Joined") { setMove({ app: a, status }); return; }
-    try { await api.post(`/applications/${a.id}/status`, { status }); toast.success(`Moved to ${status}`); reload(); } catch (err) { toast.error(errMsg(err)); }
+    setMove({ app: a, status });  // terminal outcomes ask for a reason; pipeline stages open the stage-completion wizard
   };
   return (
     <div className="scroll-thin -mx-4 overflow-x-auto px-4 pb-4" data-testid="kanban-board">

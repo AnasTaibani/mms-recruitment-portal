@@ -23,6 +23,7 @@ class ReqIn(BaseModel):
     hiring_manager_id: Optional[str] = None
     recruiter_id: Optional[str] = None
     positions: Optional[int] = Field(None, ge=0)
+    interview_rounds_required: Optional[int] = Field(None, ge=1)  # configurable; no upper limit
     experience: Optional[str] = None
     min_ctc: Optional[float] = None
     max_ctc: Optional[float] = None
@@ -132,6 +133,9 @@ async def closure_issues(req, data):
     positions = data.get("positions", req.get("positions")) or 0
     if (req.get("filled_positions") or 0) < positions and not (data.get("closure_reason") or req.get("closure_reason") or "").strip():
         issues.append("Not all positions are filled — a closure reason is required")
+    pending_cost = await db.applications.count_documents({"requisition_id": req["id"], "status": "Joined", "cost_status": {"$in": [None, ""]}})
+    if pending_cost:
+        issues.append(f"{pending_cost} joined candidate(s) have no recruitment cost reconciliation status (Cost Recorded / Invoice Pending / No Recruitment Cost)")
     return issues
 
 
@@ -474,6 +478,7 @@ class StatusIn(BaseModel):
     status: str
     reason: Optional[str] = None
     joining_date: Optional[str] = None
+    override_reason: Optional[str] = None  # Super Admin exception (audited)
 
 
 @router.post("/applications/{aid}/status")
@@ -481,10 +486,128 @@ async def move_application(aid: str, body: StatusIn, user=Depends(get_user)):
     if not (can(user, "app.move") or (can(user, "app.decide") and body.status in HM_ALLOWED)):
         raise HTTPException(403, "You are not permitted to move candidates to this stage")
     app = await get_visible("applications", "app", aid, await get_scope(user))
-    if body.status == "Joined":
-        if not body.joining_date:
-            raise HTTPException(400, "Actual date of joining is required")
+    if body.status == "Joined" and not body.override_reason:
+        # Joined is only reached through a real joining record with an actual date (and an accepted offer)
         from routes_offers import mark_joined
-        await mark_joined(app, user, body.joining_date)
+        from workflow import allowed_targets, not_future
+        if body.status not in await allowed_targets(app):
+            raise HTTPException(400, f"Transition {app['status']} → Joined is not permitted")
+        j = await db.joinings.find_one({"application_id": app["id"], "status": {"$nin": ["Cancelled", "No Show"]}}, {"_id": 0})
+        date = body.joining_date or (j or {}).get("actual_date")
+        if not j or not date:
+            from workflow import assert_prerequisites
+            await assert_prerequisites(app, "Joined")
+        not_future(date, "Actual date of joining")
+        await mark_joined(app, user, date)
         return await get_visible("applications", "app", aid, await get_scope(user))
-    return await set_app_status(app, body.status, user, body.reason)
+    return await set_app_status(app, body.status, user, body.reason, override_reason=body.override_reason)
+
+
+# ---------- screening & shortlisting records ----------
+class StageReviewIn(BaseModel):
+    stage: str
+    date: Optional[str] = None
+    owner: Optional[str] = None
+    decision: Optional[str] = None
+    remarks: Optional[str] = ""
+
+
+@router.get("/applications/{aid}/stage-reviews")
+async def get_stage_reviews(aid: str, user=Depends(require("app.view"))):
+    await get_visible("applications", "app", aid, await get_scope(user))
+    return await db.stage_reviews.find({"application_id": aid}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@router.post("/applications/{aid}/stage-reviews")
+async def add_stage_review(aid: str, body: StageReviewIn, user=Depends(require("app.move"))):
+    from workflow import SCREENING_DECISIONS, IDX, assert_prerequisites, not_future
+    app = await get_visible("applications", "app", aid, await get_scope(user))
+    if body.stage not in SCREENING_DECISIONS:
+        raise HTTPException(400, "Stage must be Screening or Shortlisting")
+    if app["closed"] and app["status"] != "On Hold":
+        raise HTTPException(400, f"Application is {app['status']}")
+    if not body.date or not (body.owner or "").strip() or body.decision not in SCREENING_DECISIONS[body.stage]:
+        raise HTTPException(400, f"{body.stage} date, {'owner' if body.stage == 'Screening' else 'reviewer'} and decision ({' / '.join(SCREENING_DECISIONS[body.stage])}) are required")
+    not_future(body.date, f"{body.stage} date")
+    passed = body.decision in ("Cleared", "Shortlisted")
+    if not passed and not (body.remarks or "").strip():
+        raise HTTPException(400, "Remarks are required when rejecting or holding")
+    if body.stage == "Shortlisting" and passed:
+        await assert_prerequisites(app, "Shortlisted", keys={"screening"})
+    ts = now_iso()
+    doc = {"id": new_id(), "application_id": aid, "candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"],
+           "stage": body.stage, "date": body.date, "owner": body.owner.strip(), "decision": body.decision, "remarks": body.remarks or "",
+           "active": True, "created_by": user["id"], "created_by_name": user["name"], "created_at": ts}
+    await db.stage_reviews.update_many({"application_id": aid, "stage": body.stage, "active": True}, {"$set": {"active": False, "superseded_at": ts}})
+    await db.stage_reviews.insert_one(dict(doc))
+    cand = await db.candidates.find_one({"id": app["candidate_id"]}, {"name": 1})
+    await log_activity(user, "stage_review", "application", aid, f"{(cand or {}).get('name', '')} · {app['code']}",
+                       f"{body.stage}: {body.decision} on {body.date} by {doc['owner']}" + (f" — {body.remarks}" if body.remarks else ""))
+    cur = IDX.get(app["status"], -1)
+    if passed:
+        target = "Screening" if body.stage == "Screening" else "Shortlisted"
+        if app["status"] == "On Hold" or cur < IDX[target]:
+            await set_app_status(app, target, user, auto=True, note=f"{body.stage} {body.decision}", records=[doc["id"]])
+    elif app["status"] not in ("CV Rejected", "On Hold"):
+        await set_app_status(app, "CV Rejected" if body.decision == "Rejected" else "On Hold", user, reason=body.remarks,
+                             auto=True, note=f"{body.stage} {body.decision}", records=[doc["id"]])
+    return doc
+
+
+class WaiverIn(BaseModel):
+    reason: str
+
+
+@router.post("/applications/{aid}/interview-waiver")
+async def interview_waiver(aid: str, body: WaiverIn, user=Depends(get_user)):
+    """Authorized exception: proceed to selection without the configured interview rounds (Super Admin, audited)."""
+    from workflow import is_override_user
+    if not is_override_user(user):
+        raise HTTPException(403, "Only a Super Admin can waive the interview requirement")
+    if not body.reason.strip():
+        raise HTTPException(400, "A reason is required")
+    app = await get_visible("applications", "app", aid, await get_scope(user))
+    w = {"reason": body.reason.strip(), "by": user["name"], "by_id": user["id"], "at": now_iso()}
+    await db.applications.update_one({"id": aid}, {"$set": {"interview_waiver": w},
+                                                   "$push": {"history": {"status": app["status"], "from": app["status"], "at": w["at"], "by": user["name"],
+                                                                         "reason": body.reason, "auto": False, "note": "Interview requirement waived", "override": True,
+                                                                         "override_reason": body.reason, "records": []}}})
+    await log_activity(user, "interview_waiver", "application", aid, app["code"], f"[EXCEPTION] Interview requirement waived: {body.reason}")
+    return await get_visible("applications", "app", aid, await get_scope(user))
+
+
+# ---------- recruitment cost reconciliation (per application) ----------
+COST_STATUSES = ["Cost Recorded", "Invoice Pending", "No Recruitment Cost"]
+
+
+class CostStatusIn(BaseModel):
+    cost_status: str
+    note: Optional[str] = ""
+
+
+@router.post("/applications/{aid}/cost-status")
+async def set_cost_status(aid: str, body: CostStatusIn, user=Depends(require("cost.manage"))):
+    app = await get_visible("applications", "app", aid, await get_scope(user))
+    if body.cost_status not in COST_STATUSES:
+        raise HTTPException(400, f"Status must be one of: {', '.join(COST_STATUSES)}")
+    linked = await db.costs.find({"candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"]}, {"_id": 0, "id": 1, "amount": 1}).to_list(100)
+    with_amount = [c for c in linked if c.get("amount") is not None]
+    if body.cost_status == "Cost Recorded" and not with_amount:
+        raise HTTPException(400, "Record the cost (with its amount) for this candidate and requisition first, or choose Invoice Pending")
+    if body.cost_status == "No Recruitment Cost" and with_amount:
+        raise HTTPException(400, "Costs with amounts are already recorded for this candidate — choose Cost Recorded")
+    upd = {"cost_status": body.cost_status, "cost_note": body.note or "", "cost_status_by": user["name"], "cost_status_at": now_iso(),
+           "cost_status_manual": True}
+    await db.applications.update_one({"id": aid}, {"$set": upd})
+    await log_activity(user, "cost_reconciliation", "application", aid, app["code"], body.cost_status + (f" — {body.note}" if body.note else "")
+                       + (f" [costs: {', '.join(c['id'] for c in linked)}]" if linked else ""))
+    return {**app, **upd}
+
+
+@router.get("/applications/{aid}/readiness")
+async def application_readiness(aid: str, target: str, user=Depends(require("app.view"))):
+    """Completed and missing prerequisites for moving this application to `target` (drives the stage wizard)."""
+    from workflow import readiness
+    app = await get_visible("applications", "app", aid, await get_scope(user))
+    return await readiness(app, target, user) | {"candidate_name": (await db.candidates.find_one({"id": app["candidate_id"]}, {"name": 1}) or {}).get("name"),
+                                                  "cost_status": app.get("cost_status"), "interview_waiver": app.get("interview_waiver")}

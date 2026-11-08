@@ -42,11 +42,12 @@ function Detail({ id, onClose, onChanged }) {
             {canFb && <Button size="sm" onClick={() => setDlg("fb")} data-testid="iv-feedback-btn">Submit feedback</Button>}
             {can("interview.manage") && open && <>
               <Button size="sm" variant="outline" onClick={() => setDlg("resched")} data-testid="iv-reschedule-btn">Reschedule</Button>
-              <Button size="sm" variant="outline" onClick={() => status({ status: "Completed" }, "Marked completed")} data-testid="iv-complete-btn">Mark completed</Button>
+              <Button size="sm" variant="outline" data-testid="iv-complete-btn"
+                onClick={() => (iv.feedback.length < iv.interviewer_ids.length && user.role === "super_admin" ? setDlg("override") : status({ status: "Completed" }, "Marked completed"))}>Mark completed</Button>
               <Button size="sm" variant="outline" onClick={() => setDlg("noshow")} data-testid="iv-noshow-btn">No show</Button>
               <Button size="sm" variant="outline" className="text-rose-700" onClick={() => setDlg("cancel")} data-testid="iv-cancel-btn">Cancel</Button></>}
-            {(can("interview.manage") || can("selection.decide")) && iv.status !== "Cancelled" && (
-              <SelectField value={null} onChange={(v) => v && status({ outcome: v }, `Outcome set to ${v}`)} options={["Selected", "Rejected", "On Hold", "Pending"].map((s) => ({ value: s, label: s }))} placeholder="Set outcome…" testid="iv-outcome-select" className="w-36" />)}
+            {(can("interview.manage") || can("selection.decide")) && iv.status === "Completed" && (
+              <SelectField value={null} onChange={(v) => v && status({ outcome: v }, `Outcome set to ${v}`)} options={["Selected", "Rejected", "On Hold", "Pending"].map((s) => ({ value: s, label: s }))} placeholder="Final recommendation…" testid="iv-outcome-select" className="w-36" />)}
           </div>
           <h4 className="eyebrow mb-2">Feedback ({iv.feedback.length}/{iv.interviewer_ids.length})</h4>
           {!iv.feedback.length && <p className="text-sm text-zinc-400">No feedback submitted yet.</p>}
@@ -67,6 +68,10 @@ function Detail({ id, onClose, onChanged }) {
             initial={{ date: iv.date, start_time: iv.start_time, end_time: iv.end_time }}
             onSubmit={async (v) => { try { await api.post(`/interviews/${id}/reschedule`, { ...v, force: true }); toast.success("Rescheduled"); setDlg(null); refresh(); } catch (e) { toast.error(errMsg(e)); } }} />
           <ConfirmDialog open={dlg === "cancel"} onOpenChange={(o) => !o && setDlg(null)} title="Cancel interview?" reason destructive confirmLabel="Cancel interview" testid="iv-cancel" onConfirm={({ reason }) => status({ status: "Cancelled", reason }, "Interview cancelled")} />
+          <ConfirmDialog open={dlg === "override"} onOpenChange={(o) => !o && setDlg(null)} title="Complete without all feedback?"
+            description={`Feedback received from ${iv.feedback.length} of ${iv.interviewer_ids.length} interviewer(s). As Super Admin you can complete it as an audited exception.`}
+            reason reasonLabel="Reason for the exception" confirmLabel="Complete with exception" testid="iv-override"
+            onConfirm={({ reason }) => status({ status: "Completed", override_reason: reason }, "Completed with exception")} />
           <ConfirmDialog open={dlg === "noshow"} onOpenChange={(o) => !o && setDlg(null)} title="Mark as no show?" description="The application will move to No Show." reason destructive confirmLabel="Mark no show" testid="iv-noshow" onConfirm={({ reason }) => status({ status: "No Show", reason }, "Marked no show")} />
         </>}
       </SheetContent>

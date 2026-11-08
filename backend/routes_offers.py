@@ -9,7 +9,7 @@ from core import (db, get_user, require, can, now_iso, today, new_id, next_code,
 
 router = APIRouter(prefix="/api")
 OPEN_OFFER = ["Draft", "Approval Pending", "Approved", "Released"]
-OFFERABLE = ["Selected", "Offer Approval Pending", "Offer Declined", "Offer Revoked", "Interview Completed"]
+OFFERABLE = ["Selected", "Offer Approval Pending", "Offer Declined", "Offer Revoked"]  # re-offer after decline / revoke / expiry
 
 
 async def labels(app):
@@ -37,30 +37,52 @@ class SelectionIn(BaseModel):
     decision: str
     decision_maker: Optional[str] = None
     selection_date: Optional[str] = None
-    compensation: Optional[float] = None
-    approval_status: Optional[str] = "Pending"
+    compensation: Optional[float] = Field(None, ge=0)
+    approval_status: Optional[str] = None
     remarks: Optional[str] = ""
+    override_reason: Optional[str] = None  # Super Admin: select without the required interviews (audited waiver)
+
+
+SELECTION_APPROVAL = ["Pending", "Approved", "Rejected"]
 
 
 @router.post("/selections")
 async def record_selection(body: SelectionIn, user=Depends(require("selection.decide"))):
+    from workflow import assert_prerequisites, is_override_user, not_future
     app = await get_visible("applications", "app", body.application_id, await get_scope(user))
     if body.decision not in ("Selected", "Rejected", "On Hold"):
         raise HTTPException(400, "Decision must be Selected, Rejected or On Hold")
+    if not body.selection_date or not (body.decision_maker or "").strip():
+        raise HTTPException(400, "Selection date and decision maker are required")
+    not_future(body.selection_date, "Selection date")
     if body.decision != "Selected" and not (body.remarks or "").strip():
         raise HTTPException(400, "Remarks are required when rejecting or holding")
-    if app["status"] == "Joined":
-        raise HTTPException(400, "Application already closed")
-    doc = body.model_dump() | {"id": new_id(), "decided_by": user["name"], "decided_by_id": user["id"],
-                               "decision_maker": body.decision_maker or user["name"],
-                               "selection_date": body.selection_date or today(), "created_at": now_iso(),
-                               "candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"]}
+    if body.decision == "Selected" and (body.compensation is None or body.approval_status not in SELECTION_APPROVAL):
+        raise HTTPException(400, "Compensation and approval status are required for a selection")
+    if app["status"] == "Joined" or (app["closed"] and app["status"] != "On Hold"):
+        raise HTTPException(400, f"Application is {app['status']} — a selection decision cannot be recorded")
+    if await db.selections.find_one({"application_id": app["id"], "active": {"$ne": False}, "decision": "Selected"}):
+        raise HTTPException(409, "An active selection already exists for this application")
+    override = (body.override_reason or "").strip()
+    if override and not is_override_user(user):
+        raise HTTPException(403, "Only a Super Admin can record a selection without the required interviews")
+    if not override:
+        await assert_prerequisites(app, "Selected", keys={"screening", "shortlisting", "interviews"})
+    ts = now_iso()
+    doc = body.model_dump() | {"id": new_id(), "decided_by": user["name"], "decided_by_id": user["id"], "decision_maker": body.decision_maker.strip(),
+                               "created_at": ts, "active": True, "candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"],
+                               "override": bool(override)}
+    if override:  # the exception is stored on the application too, so later stages see the waived interviews
+        await db.applications.update_one({"id": app["id"]}, {"$set": {"interview_waiver": {"reason": override, "by": user["name"], "by_id": user["id"], "at": ts}}})
+        app["interview_waiver"] = {"reason": override, "by": user["name"]}
+    await db.selections.update_many({"application_id": app["id"], "active": {"$ne": False}}, {"$set": {"active": False, "superseded_at": ts}})
     await db.selections.insert_one(doc)
     c, r = await labels(app)
     await log_activity(user, "selection", "application", app["id"], f"{c['name']} · {app['code']}",
-                       f"{body.decision}" + (f" at ₹{body.compensation} L" if body.compensation else "") + (f" — {body.remarks}" if body.remarks else ""))
+                       f"{body.decision}" + (f" at ₹{body.compensation} L" if body.compensation else "") + (f" — {body.remarks}" if body.remarks else "")
+                       + (f" [EXCEPTION: interviews waived — {override}]" if override else ""))
     target = {"Selected": "Selected", "Rejected": "Interview Rejected", "On Hold": "On Hold"}[body.decision]
-    await set_app_status(app, target, user, reason=body.remarks, auto=True, note="Selection decision")
+    await set_app_status(app, target, user, reason=body.remarks, auto=True, note="Selection decision", records=[doc["id"]])
     doc.pop("_id", None)
     return doc
 
@@ -103,18 +125,23 @@ async def get_offers(request: Request, user=Depends(require("offer.view"))):
 @router.post("/offers")
 async def create_offer(body: OfferIn, user=Depends(require("offer.manage"))):
     app = await get_visible("applications", "app", body.application_id or "", await get_scope(user))
-    if app["status"] not in OFFERABLE:
+    from workflow import assert_prerequisites, legacy_index, IDX
+    if await db.offers.find_one({"application_id": app["id"], "status": {"$in": OPEN_OFFER + ["Accepted"]}}):
+        raise HTTPException(409, "An active offer already exists for this application")
+    previous = await db.offers.find_one({"application_id": app["id"]}, {"_id": 0}, sort=[("created_at", -1)])
+    legacy_without_offer = not previous and legacy_index(app) >= IDX["Offer Approval Pending"] and app["status"] in IDX
+    if app["status"] not in OFFERABLE and not legacy_without_offer:
         raise HTTPException(400, f"Candidate must be Selected before an offer is created (current: {app['status']})")
-    if await db.offers.find_one({"application_id": app["id"], "status": {"$in": OPEN_OFFER}}):
-        raise HTTPException(409, "An open offer already exists for this application")
+    await assert_prerequisites(app, "Selected", keys={"selection"})
     if not body.designation or body.ctc is None or not body.validity_date:
         raise HTTPException(400, "Designation, offered CTC and validity date are required")
     ts = now_iso()
     doc = body.model_dump() | {"id": new_id(), "code": await next_code("OFF"), "candidate_id": app["candidate_id"],
                                "requisition_id": app["requisition_id"], "recruiter_id": app.get("recruiter_id"),
                                "status": "Draft", "approval_status": "Not Submitted", "created_by": user["id"],
-                               "created_at": ts, "updated_at": ts,
-                               "history": [{"at": ts, "by": user["name"], "action": "Created", "details": f"₹{body.ctc} L"}]}
+                               "created_at": ts, "updated_at": ts, "replaces": previous["id"] if previous else None,
+                               "history": [{"at": ts, "by": user["name"], "action": "Created" if not previous else f"Re-offer (replaces {previous['code']}, {previous['status']})",
+                                            "details": f"₹{body.ctc} L"}]}
     await db.offers.insert_one(doc)
     c, r = await labels(app)
     await log_activity(user, "offer_create", "application", app["id"], f"{c['name']} · {doc['code']}", f"{body.designation} at ₹{body.ctc} L")
@@ -165,7 +192,14 @@ async def offer_action(oid: str, body: OfferAction, user=Depends(get_user)):
         raise HTTPException(400, f"Cannot {body.action} an offer that is {o['status']}")
     if body.action in ("reject", "decline", "revoke") and not (body.reason or "").strip():
         raise HTTPException(400, "A reason is required")
+    app0 = await db.applications.find_one({"id": o["application_id"]}, {"_id": 0, "status": 1, "closed": 1})
+    if app0 and (app0["status"] == "Joined" or (app0.get("closed") and app0["status"] not in ("Offer Declined", "Offer Revoked"))):
+        raise HTTPException(400, f"The application is {app0['status']} — offer actions are closed")
+    from workflow import not_future
     d = body.date or today()
+    not_future(d, "Date")
+    if body.action == "accept" and o.get("release_date") and d < o["release_date"]:
+        raise HTTPException(400, "Acceptance date cannot be before the release date")
     upd = {"status": new_status, "updated_at": now_iso()}
     if body.action == "submit":
         upd["approval_status"] = "Pending"
@@ -186,7 +220,9 @@ async def offer_action(oid: str, body: OfferAction, user=Depends(get_user)):
     c, r = await labels(app)
     await log_activity(user, f"offer_{body.action}", "application", app["id"], f"{c['name']} · {o['code']}", f"{o['status']} → {new_status}" + (f" ({body.reason})" if body.reason else ""))
     if body.action in APP_STATUS:
-        await set_app_status(app, APP_STATUS[body.action], user, reason=body.reason, auto=True, note=o["code"])
+        await set_app_status(app, APP_STATUS[body.action], user, reason=body.reason, auto=True, note=o["code"], records=[oid])
+    elif body.action == "reject" and app["status"] == "Offer Approval Pending":  # back to Selected until a revised offer is submitted
+        await set_app_status(app, "Selected", user, reason=body.reason, auto=True, note=f"{o['code']} approval rejected", records=[oid])
     if body.action == "submit":
         await notify(await admin_user_ids(), "offer", "Offer awaiting approval", f"{o['code']} · {c['name']} · ₹{o['ctc']} L", "/offers")
     if body.action in ("approve", "reject"):
@@ -210,7 +246,7 @@ async def create_joining_doc(app, user, tentative=None, status="Pending"):
     doc = {"id": new_id(), "code": await next_code("JN"), "application_id": app["id"], "candidate_id": app["candidate_id"],
            "requisition_id": app["requisition_id"], "recruiter_id": app.get("recruiter_id"),
            "partner_id": (c or {}).get("partner_id"), "tentative_date": tentative, "confirmed_date": None,
-           "actual_date": None, "status": status, "checklist": await default_checklist(), "remarks": "",
+           "actual_date": None, "status": status, "checklist": (cl := await default_checklist()), "checklist_status": checklist_status(cl), "remarks": "",
            "created_at": ts, "updated_at": ts, "history": [{"at": ts, "by": user["name"] if user else "System", "action": status, "details": tentative or ""}]}
     await db.joinings.insert_one(doc)
     doc.pop("_id", None)
@@ -218,13 +254,32 @@ async def create_joining_doc(app, user, tentative=None, status="Pending"):
     return doc
 
 
+def checklist_status(items):
+    items = items or []
+    got = sum(1 for i in items if i.get("received"))
+    return "Not applicable" if not items else "Complete" if got == len(items) else "Partial" if got else "Pending"
+
+
 async def mark_joined(app, user, actual_date):
+    """Joined needs an accepted offer and an existing joining record — it never creates them."""
+    from workflow import not_future
+    if not actual_date:
+        raise HTTPException(400, "Actual date of joining is required")
+    not_future(actual_date, "Actual date of joining")
+    offer = await db.offers.find_one({"application_id": app["id"], "status": "Accepted"}, {"_id": 0})
+    if not offer:
+        from workflow import legacy_index, IDX
+        if legacy_index(app) < IDX["Offer Accepted"]:
+            raise HTTPException(400, "An accepted offer is required before the candidate can be marked Joined")
+    elif offer.get("accepted_date") and actual_date < offer["accepted_date"]:
+        raise HTTPException(400, "Actual date of joining cannot be before the offer acceptance date")
     j = await db.joinings.find_one({"application_id": app["id"], "status": {"$nin": ["Cancelled", "No Show"]}}, {"_id": 0})
     if not j:
-        j = await create_joining_doc(app, user)
-    await db.joinings.update_one({"id": j["id"]}, {"$set": {"status": "Joined", "actual_date": actual_date, "updated_at": now_iso()},
+        raise HTTPException(400, "No joining record exists for this candidate — it is created when the offer is accepted")
+    await db.joinings.update_one({"id": j["id"]}, {"$set": {"status": "Joined", "actual_date": actual_date, "updated_at": now_iso(),
+                                                            "checklist_status": checklist_status(j.get("checklist"))},
                                                    "$push": {"history": {"at": now_iso(), "by": user["name"], "action": "Joined", "details": actual_date}}})
-    await set_app_status(app, "Joined", user, auto=True, note=f"Joined on {actual_date}")
+    await set_app_status(app, "Joined", user, auto=True, note=f"Joined on {actual_date}", records=[j["id"]] + ([offer["id"]] if offer else []))
     filled = await recount_filled(app["requisition_id"])
     req = await db.requisitions.find_one({"id": app["requisition_id"]}, {"_id": 0})
     await log_activity(user, "joined", "requisition", req["id"], f"{req['code']} {req['title']}", f"Filled {filled}/{req.get('positions')}")
@@ -259,7 +314,7 @@ class JoiningIn(BaseModel):
 @router.post("/joinings")
 async def add_joining(body: JoiningIn, user=Depends(require("joining.manage"))):
     app = await get_visible("applications", "app", body.application_id or "", await get_scope(user))
-    if app["status"] not in ("Offer Accepted", "Offer Released"):
+    if app["status"] != "Offer Accepted" or not await db.offers.find_one({"application_id": app["id"], "status": "Accepted"}):
         raise HTTPException(400, "Joining can only be tracked after the offer is accepted")
     if await db.joinings.find_one({"application_id": app["id"], "status": {"$nin": ["Cancelled", "No Show"]}}):
         raise HTTPException(409, "A joining record already exists")
@@ -285,14 +340,19 @@ async def update_joining(jid: str, body: JoiningIn, user=Depends(require("joinin
     if st == "Joining Deferred" and not data.get("tentative_date"):
         raise HTTPException(400, "Provide the new tentative joining date")
     data["updated_at"] = now_iso()
+    if "checklist" in data:
+        data["checklist_status"] = checklist_status(data["checklist"])
     if reason:
         data["status_reason"] = reason
     hist = {"at": now_iso(), "by": user["name"], "action": st or "Updated", "details": reason or ", ".join(k for k in data if k != "updated_at")}
-    await db.joinings.update_one({"id": jid}, {"$set": {k: v for k, v in data.items() if not (st == "Joined" and k == "status")}, "$push": {"history": hist}})
     app = await db.applications.find_one({"id": j["application_id"]}, {"_id": 0})
+    if st == "Joined":  # validate (accepted offer, dates) before anything is written
+        await mark_joined(app, user, data["actual_date"])
+    await db.joinings.update_one({"id": jid}, {"$set": {k: v for k, v in data.items() if not (st == "Joined" and k == "status")},
+                                               **({} if st == "Joined" else {"$push": {"history": hist}})})
     await log_activity(user, "joining_update", "application", app["id"], j["code"], f"{st or 'Updated'}" + (f" ({reason})" if reason else ""))
     if st == "Joined":
-        await mark_joined(app, user, data["actual_date"])
+        pass
     elif st == "No Show":
         await set_app_status(app, "No Show", user, reason=reason, auto=True, note=j["code"])
     elif st == "Cancelled":
@@ -313,7 +373,7 @@ class CostIn(BaseModel):
     candidate_id: Optional[str] = None
     invoice_no: Optional[str] = None
     invoice_date: Optional[str] = None
-    ctc: Optional[float] = Field(None, ge=0)                    # candidate CTC in ₹ lakhs (used in cost per hire)
+    ctc: Optional[float] = Field(None, ge=0)                    # candidate CTC in ₹ lakhs — only to work out a %-based fee; never counted as a cost
     fee_percent: Optional[float] = Field(None, ge=0, le=100)    # e.g. 8.33 for M2S, 7 for other partners
     amount: Optional[float] = Field(None, ge=0)
     payment_status: Optional[str] = None
@@ -369,24 +429,40 @@ def apply_fee(data, current=None):
     return data
 
 
-async def hire_ctc(candidate_ids):
-    """CTC per joined candidate: the CTC typed on that candidate's cost entries, else the offer CTC."""
-    ids = [c for c in candidate_ids if c]
-    out = {c: None for c in ids}
-    async for c in db.costs.find({"candidate_id": {"$in": ids}, "ctc": {"$ne": None}}, {"_id": 0, "candidate_id": 1, "ctc": 1}):
-        out[c["candidate_id"]] = max(out[c["candidate_id"]] or 0, c["ctc"])
-    missing = [c for c, v in out.items() if v is None]
-    if missing:
-        offers = await db.offers.find({"candidate_id": {"$in": missing}, "ctc": {"$ne": None}}, {"_id": 0}).sort("created_at", 1).to_list(5000)
-        for o in offers:  # later offers overwrite earlier ones; an accepted offer always wins
-            if out.get(o["candidate_id"]) is None or o.get("status") == "Accepted":
-                out[o["candidate_id"]] = o["ctc"]
-    return out
+async def link_cost(data, current=None):
+    """Tie the cost to the candidate's application: infer the requisition when only one application fits."""
+    m = {**(current or {}), **data}
+    if m.get("candidate_id") and not m.get("requisition_id"):
+        apps = await db.applications.find({"candidate_id": m["candidate_id"]}, {"_id": 0, "requisition_id": 1, "status": 1}).to_list(50)
+        joined = [a for a in apps if a["status"] == "Joined"]
+        pick = joined if len(joined) == 1 else apps if len(apps) == 1 else []
+        if pick:
+            data["requisition_id"] = pick[0]["requisition_id"]
+    return data
+
+
+async def sync_cost_status(candidate_id, requisition_id, user):
+    """Cost reconciliation on the application follows its linked cost records (a manual "No Recruitment Cost" is replaced once a cost is added)."""
+    if not candidate_id or not requisition_id:
+        return
+    app = await db.applications.find_one({"candidate_id": candidate_id, "requisition_id": requisition_id}, {"_id": 0})
+    if not app:
+        return
+    costs = await db.costs.find({"candidate_id": candidate_id, "requisition_id": requisition_id}, {"_id": 0, "amount": 1}).to_list(100)
+    if not costs:
+        status = None if app.get("cost_status") in ("Cost Recorded", "Invoice Pending") and not app.get("cost_status_manual") else app.get("cost_status")
+    else:
+        status = "Cost Recorded" if all(c.get("amount") is not None for c in costs) else "Invoice Pending"
+    if status != app.get("cost_status"):
+        await db.applications.update_one({"id": app["id"]}, {"$set": {"cost_status": status, "cost_status_by": user["name"], "cost_status_at": now_iso(), "cost_status_manual": False}})
+        await log_activity(user, "cost_status", "application", app["id"], app["code"], f"Cost reconciliation: {app.get('cost_status') or '—'} → {status or '—'} (from cost records)")
 
 
 def validate_cost(data, creating):
-    if creating and (not data.get("category_id") or data.get("amount") is None or not data.get("invoice_date")):
-        raise HTTPException(400, "Cost category, invoice date and amount are required")
+    if creating and not data.get("category_id"):
+        raise HTTPException(400, "Cost category is required")
+    if data.get("payment_status") in ("Paid", "Partially Paid") and data.get("amount") is None:
+        raise HTTPException(400, "Enter the amount before marking the cost as paid")
     if creating and not (data.get("recruiter_id") or data.get("partner_id")):
         raise HTTPException(400, "Select the recruiter or recruitment partner this cost relates to")
     if data.get("payment_status") and data["payment_status"] not in PAYMENT_STATUSES:
@@ -403,11 +479,14 @@ async def create_cost(body: CostIn, user=Depends(require("cost.manage"))):
         data.pop("partner_name", None)
     data = await resolve_named(data, user, "partner_name", "partner_id", "partner", "cost form")
     data = apply_fee(data)
+    data = await link_cost(data)
     data["payment_status"] = data.get("payment_status") or "Pending"
     validate_cost(data, True)
     doc = data | {"id": new_id(), "code": await next_code("CST"), "created_by": user["name"], "created_at": now_iso(), "updated_at": now_iso()}
     await db.costs.insert_one(doc)
-    await log_activity(user, "cost_create", "cost", doc["id"], doc["code"], f"₹{doc['amount']} L · invoice {doc.get('invoice_no') or '—'}")
+    await log_activity(user, "cost_create", "cost", doc["id"], doc["code"],
+                       (f"₹{doc['amount']} L" if doc.get("amount") is not None else "amount not yet known") + f" · invoice {doc.get('invoice_no') or 'pending'}")
+    await sync_cost_status(doc.get("candidate_id"), doc.get("requisition_id"), user)
     doc.pop("_id", None)
     return doc
 
@@ -420,9 +499,14 @@ async def update_cost(cid: str, body: CostIn, user=Depends(require("cost.manage"
     from routes_recruit import resolve_named
     data = await resolve_named(body.model_dump(exclude_unset=True), user, "partner_name", "partner_id", "partner", "cost form")
     data = apply_fee(data, c)
+    data = await link_cost(data, c)
     validate_cost({**c, **data}, False)
     data["updated_at"] = now_iso()
     await db.costs.update_one({"id": cid}, {"$set": data})
+    await sync_cost_status(c.get("candidate_id"), c.get("requisition_id"), user)
+    m = {**c, **data}
+    if (m.get("candidate_id"), m.get("requisition_id")) != (c.get("candidate_id"), c.get("requisition_id")):
+        await sync_cost_status(m.get("candidate_id"), m.get("requisition_id"), user)
     await log_activity(user, "cost_update", "cost", cid, c["code"], ", ".join(f"{k}: {c.get(k)} → {v}" for k, v in data.items() if k != "updated_at" and c.get(k) != v))
     return {**c, **data}
 
@@ -434,4 +518,5 @@ async def delete_cost(cid: str, user=Depends(require("cost.manage"))):
         raise HTTPException(404, "Not found")
     await db.costs.delete_one({"id": cid})
     await log_activity(user, "cost_delete", "cost", cid, c["code"], f"₹{c.get('amount')} L removed")
+    await sync_cost_status(c.get("candidate_id"), c.get("requisition_id"), user)
     return {"ok": True}

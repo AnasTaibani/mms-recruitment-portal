@@ -5,7 +5,8 @@ import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN = {"email": "anastaibani53@gmail.com", "password": "MMS@Admin2026"}
+ADMIN = {"email": os.environ.get("ADMIN_EMAIL", "anastaibani53@gmail.com").lower(), "password": os.environ.get("ADMIN_PASSWORD", "MMS@Admin2026")}
+ROLE = {"hr_admin": "recruiter", "hiring_manager": "management"}  # retired roles map to the 4 current personas
 PW = "TestPass@123"
 
 
@@ -13,6 +14,8 @@ def sess(email=None, pw=PW):
     s = requests.Session()
     r = s.post(f"{API}/auth/login", json={"email": email, "password": pw} if email else ADMIN)
     assert r.status_code == 200, r.text
+    if r.json().get("access_token"):  # cookies are Secure; over plain http the Bearer token is used (same as the deployed app)
+        s.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
     return s
 
 
@@ -21,7 +24,7 @@ def ctx():
     a = sess()
     c = {"a": a}
     for role, n in [("recruiter", "rx"), ("recruiter", "ry"), ("interviewer", "ix"), ("interviewer", "iy"), ("hiring_manager", "hx")]:
-        r = a.post(f"{API}/users", json={"email": f"test_{n}@mms.test", "name": f"TEST_{n}", "role": role, "password": PW})
+        r = a.post(f"{API}/users", json={"email": f"test_{n}@mms.test", "name": f"TEST_{n}", "role": ROLE.get(role, role), "password": PW})
         assert r.status_code == 200, r.text
         c[n] = r.json()["id"]
     ms = a.get(f"{API}/masters").json()

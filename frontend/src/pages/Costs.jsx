@@ -32,14 +32,14 @@ export default function Costs() {
     { name: "recruiter_id", label: "Recruiter", master: "recruiter" },
     { name: "partner_name", label: "Recruitment Partner", suggest: "partner", placeholder: "Type the partner / consultancy name" },
     { name: "ctc", label: "Candidate CTC (₹ L)", type: "number", max: 1000, maxMessage: LAKH_MSG, placeholder: "e.g. 35",
-      help: (v) => rupees(v.ctc) || "Annual CTC in lakhs. Counted once per joined candidate in Cost per Hire." },
+      help: (v) => rupees(v.ctc) || "Only used to work out a %-based fee. Candidate CTC is never counted as a recruitment cost." },
     { name: "fee_percent", label: "Fee %", type: "number", max: 100, maxMessage: "Enter a percentage between 0 and 100", placeholder: "e.g. 8.33",
       help: "Partner fee as % of CTC — e.g. 8.33 for M2S, 7 for others" },
-    { name: "amount", label: "Fee Amount (₹ L)", type: "number", required: true, max: 1000, maxMessage: LAKH_MSG,
+    { name: "amount", label: "Fee Amount (₹ L) — leave blank if not yet known", type: "number", max: 1000, maxMessage: LAKH_MSG,
       derive: { from: ["ctc", "fee_percent"], fn: feeOf },
       help: (v) => [rupees(v.amount), feeOf(v) !== undefined && "auto: CTC × Fee %"].filter(Boolean).join(" · ") || "Filled in automatically from CTC × Fee %, or type a fixed amount" },
     { name: "invoice_no", label: "Invoice Number" },
-    { name: "invoice_date", label: "Invoice Date", type: "date", required: true },
+    { name: "invoice_date", label: "Invoice Date (if received)", type: "date" },
     { name: "payment_status", label: "Payment Status", type: "select", options: meta.payment_statuses.map((s) => ({ value: s, label: s })), default: "Pending" },
     { name: "payment_date", label: "Payment Date", type: "date" },
     { name: "remarks", label: "Remarks", type: "textarea" },
@@ -69,19 +69,19 @@ export default function Costs() {
   const sel = (k, opts, ph) => <SelectField value={f[k]} onChange={(v) => setF({ ...f, [k]: v })} options={opts} placeholder={ph} testid={`cost-filter-${k}`} className="w-40" />;
   return (
     <div>
-      <PageHeader eyebrow="Finance" title="Recruitment Costs" description="Cost per Hire = (CTC of each joined candidate + consultancy fees + recruiter fees) ÷ candidates joined. Amounts are in ₹ lakhs."
+      <PageHeader eyebrow="Finance" title="Recruitment Costs" description="Cost per Hire = (recruiter fees + recruitment partner / consultancy fees) ÷ candidates joined. Candidate CTC is not a recruitment cost. Amounts are in ₹ lakhs."
         actions={<>
           {can("reports.export") && <Button variant="outline" onClick={() => download("/reports/costs", f)} data-testid="cost-export-btn"><Download className="mr-2 h-4 w-4" />Export</Button>}
           {can("cost.manage") && <Button onClick={() => setEdit({})} data-testid="cost-new-btn"><Plus className="mr-2 h-4 w-4" />Add cost</Button>}
         </>} />
       <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Candidate CTC (joined)" value={an?.cost ? lakhs(an.cost.ctc_total) : "—"} hint="Counted once per joined candidate" testid="cost-ctc-total" />
-        <Kpi label="Fees (consultancy + recruiter)" value={an?.cost ? lakhs(an.cost.fees) : "—"} hint={`Paid ${lakhs((data || []).filter((c) => c.payment_status === "Paid").reduce((s, c) => s + (c.amount || 0), 0))}`} testid="cost-fees" />
-        <Kpi label="Total hiring cost" value={an?.cost ? lakhs(an.cost.total) : "—"} hint="CTC + fees" testid="cost-total" />
-        <Kpi label="Candidates joined" value={an?.cost?.hires ?? "—"} hint="Denominator (actual joiners)" />
-        <Kpi label="Cost per hire" value={an?.cost ? (an.cost.cost_per_hire === null ? "N/A" : lakhs(an.cost.cost_per_hire)) : "—"} hint="(CTC + fees) ÷ joined" testid="cost-per-hire" />
+        <Kpi label="Recruitment fees" value={an?.cost ? lakhs(an.cost.total) : "—"} hint={`Recruiter + partner / consultancy · paid ${lakhs((data || []).filter((c) => c.payment_status === "Paid").reduce((s, c) => s + (c.amount || 0), 0))}`} testid="cost-fees" />
+        <Kpi label="Candidates joined" value={an?.cost?.hires ?? "—"} hint="Denominator (actual joiners, same filters)" />
+        <Kpi label="Cost per hire" value={an?.cost ? (an.cost.cost_per_hire === null ? "N/A" : lakhs(an.cost.cost_per_hire)) : "—"} hint="Fees ÷ joined" testid="cost-per-hire" />
+        <Kpi label="Invoices pending" value={an?.cost ? an.cost.amount_pending : "—"} hint="Cost entries without an amount yet" testid="cost-amount-pending" />
+        <Kpi label="Hires not reconciled" value={an?.cost?.reconciliation ? an.cost.reconciliation["Not reconciled"] : "—"}
+          hint={an?.cost?.reconciliation ? `${an.cost.reconciliation["Cost Recorded"]} recorded · ${an.cost.reconciliation["Invoice Pending"]} invoice pending · ${an.cost.reconciliation["No Recruitment Cost"]} no cost` : ""} testid="cost-unreconciled" />
       </div>
-      {an?.cost?.ctc_missing > 0 && <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" data-testid="cost-ctc-missing">{an.cost.ctc_missing} joined candidate(s) have no CTC on a cost entry or offer, so their CTC is not included yet. Add it on their cost entry.</p>}
       <DataTable testid="cost-table" columns={cols} data={data} loading={loading}
         toolbar={<>
           {sel("category_id", m("cost_category"), "All categories")}

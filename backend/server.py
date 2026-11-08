@@ -14,7 +14,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 from starlette.middleware.cors import CORSMiddleware
 
 from core import (db, client, hash_password, new_id, now_iso, today, notify, user_ids_for_person, admin_user_ids,
-                  days_between, INACTIVE, PIPELINE, TERMINAL, ALL_STATUSES)
+                  days_between, set_app_status, INACTIVE, PIPELINE, TERMINAL, ALL_STATUSES)
 from storage import init_storage
 import routes_admin
 import routes_recruit
@@ -60,10 +60,25 @@ DEFAULT_MASTERS = {
 
 
 def default_transitions():
-    t = {}
-    for s in ALL_STATUSES:
-        t[s] = [x for x in ALL_STATUSES if x != s] if s != "Joined" else []
-    return t
+    from workflow import static_matrix
+    return static_matrix()
+
+
+async def migrate_workflow():
+    """One-time, non-destructive: (1) mark applications that existed before the stage controls with the furthest stage
+    they had reached, so their earlier stages are accepted as historical; (2) replace the old permissive transition
+    settings with the defined matrix. No record is deleted and no status is changed."""
+    from workflow import reached_index
+    s = await db.settings.find_one({"key": "general"}) or {}
+    if s.get("workflow_version", 0) >= 1:
+        return
+    n = 0
+    async for a in db.applications.find({"legacy_stage_index": {"$exists": False}}, {"_id": 0, "id": 1, "status": 1, "history": 1}):
+        await db.applications.update_one({"id": a["id"]}, {"$set": {"legacy_stage_index": reached_index(a)}})
+        n += 1
+    await db.settings.update_one({"key": "general"}, {"$set": {"transitions": default_transitions(), "workflow_version": 1,
+                                                               "previous_transitions": s.get("transitions")}}, upsert=True)
+    logger.info("workflow migration: %s existing applications marked as legacy; transition matrix applied", n)
 
 
 async def migrate_roles():
@@ -93,7 +108,8 @@ async def seed():
     s = await db.settings.find_one({"key": "general"})
     if not s:
         await db.settings.insert_one({"key": "general", "rating_scale": 5, "stale_days": 7, "offer_expiry_alert_days": 3,
-                                      "transitions": default_transitions()})
+                                      "transitions": default_transitions(), "workflow_version": 1})
+    await migrate_workflow()
     email = os.environ["ADMIN_EMAIL"].lower()
     if not await db.users.find_one({"email": email}):
         await db.users.insert_one({"id": new_id(), "email": email, "name": os.environ.get("ADMIN_NAME", "Super Admin"),
@@ -122,8 +138,12 @@ async def scan_alerts():
     async for o in db.offers.find({"status": "Released"}, {"_id": 0}):
         v = o.get("validity_date")
         if v and v < t:
-            await db.offers.update_one({"id": o["id"]}, {"$set": {"status": "Expired"}, "$push": {"history": {"at": now_iso(), "by": "System", "action": "Expired", "details": v}}})
-            await notify(admins + await user_ids_for_person(o.get("recruiter_id")), "offer", "Offer expired", f"{o['code']} expired on {v}", "/offers", key=f"expired:{o['id']}")
+            await db.offers.update_one({"id": o["id"]}, {"$set": {"status": "Expired", "updated_at": now_iso()}, "$push": {"history": {"at": now_iso(), "by": "System", "action": "Expired", "details": v}}})
+            await notify(admins + await user_ids_for_person(o.get("recruiter_id")), "offer", "Offer expired",
+                         f"{o['code']} expired on {v} — the candidate is back at Selected; create a re-offer or close the application", "/offers", key=f"expired:{o['id']}")
+            app = await db.applications.find_one({"id": o.get("application_id")}, {"_id": 0})
+            if app and app["status"] == "Offer Released":  # the selection stands; a replacement offer goes through the re-offer process
+                await set_app_status(app, "Selected", None, auto=True, note=f"{o['code']} expired on {v}", records=[o["id"]], check=False)
         elif v and v <= horizon:
             await notify(admins + await user_ids_for_person(o.get("recruiter_id")), "offer", "Offer expiring soon", f"{o['code']} valid until {v}", "/offers", key=f"expiring:{o['id']}")
     async for o in db.offers.find({"status": "Approval Pending"}, {"_id": 0}):

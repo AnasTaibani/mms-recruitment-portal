@@ -7,6 +7,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
+from workflow import static_matrix
 from core import (db, get_user, require, can, make_token, hash_password, verify_password, public_user, now_iso,
                   new_id, log_activity, get_settings, get_scope, get_visible, ROLES, ROLE_PERSON, PIPELINE, TERMINAL,
                   ALL_STATUSES, REQ_STATUSES, INTERVIEW_STATUSES, INTERVIEW_MODES, OFFER_STATUSES, JOINING_STATUSES,
@@ -264,7 +265,8 @@ async def meta(user=Depends(get_user)):
     return {"pipeline": PIPELINE, "terminal": TERMINAL, "req_statuses": REQ_STATUSES, "interview_statuses": INTERVIEW_STATUSES,
             "interview_modes": INTERVIEW_MODES, "offer_statuses": OFFER_STATUSES, "joining_statuses": JOINING_STATUSES,
             "recommendations": RECOMMENDATIONS, "payment_statuses": PAYMENT_STATUSES, "roles": ROLES,
-            "master_types": MASTER_TYPES, "settings": {k: v for k, v in s.items() if k != "key"}}
+            "master_types": MASTER_TYPES, "settings": {k: v for k, v in s.items() if k not in ("key", "previous_transitions")},
+            "workflow_matrix": static_matrix(), "cost_statuses": ["Cost Recorded", "Invoice Pending", "No Recruitment Cost"]}
 
 
 @router.put("/settings")
@@ -273,7 +275,9 @@ async def update_settings(body: SettingsIn, user=Depends(require("settings.manag
     if "rating_scale" in data and data["rating_scale"] not in (3, 4, 5, 10):
         raise HTTPException(400, "Rating scale must be 3, 4, 5 or 10")
     if "transitions" in data:
-        data["transitions"] = {k: [s for s in v if s in ALL_STATUSES] for k, v in data["transitions"].items() if k in ALL_STATUSES}
+        # settings can only narrow the defined workflow matrix, never open new paths
+        m = static_matrix()
+        data["transitions"] = {k: [s for s in v if s in m.get(k, [])] for k, v in data["transitions"].items() if k in ALL_STATUSES}
     await db.settings.update_one({"key": "general"}, {"$set": data}, upsert=True)
     await log_activity(user, "settings_update", "settings", "general", "System settings", ", ".join(data.keys()))
     return await get_settings()

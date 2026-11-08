@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { StageWizard } from "@/components/StageWizard";
 
 const opts = (arr) => arr.map((s) => ({ value: s, label: s }));
 
@@ -19,6 +20,7 @@ export const reqFields = (meta) => [
   { name: "hiring_manager_name", label: "Hiring Manager", suggest: "hiring_manager", placeholder: "Type the hiring manager's name" },
   { name: "recruiter_id", label: "Assigned Recruiter", master: "recruiter" },
   { name: "positions", label: "Number of Open Positions", type: "number", required: true, min: 1 },
+  { name: "interview_rounds_required", label: "Interview Rounds Required", type: "number", min: 1, help: "Completed rounds (with all feedback) needed before selection. Blank = 1." },
   { name: "experience", label: "Required Experience", placeholder: "e.g. 4-6 years" },
   { name: "min_ctc", label: "Minimum CTC (₹ L)", type: "number" },
   { name: "max_ctc", label: "Maximum CTC (₹ L)", type: "number" },
@@ -195,11 +197,12 @@ export function MoveDialog({ move, onClose, onDone }) {
   const { meta } = useAuth();
   if (!move) return null;
   const terminal = meta.terminal.includes(move.status);
-  const joined = move.status === "Joined";
+  // every move into a pipeline stage goes through the guided wizard, which checks (and lets the user complete) the earlier stages
+  if (!terminal) return <StageWizard app={move.app} target={move.status} focus={move.focus} open={!!move} onClose={onClose} onDone={onDone} />;
   return (
     <ConfirmDialog open={!!move} onOpenChange={(o) => !o && onClose()} title={`Move to "${move.status}"`} testid="move"
-      description={`${move.app.candidate_name} · ${move.app.requisition_title} (currently ${move.app.status})`} reason={terminal}
-      dateLabel={joined ? "Actual date of joining" : null} confirmLabel="Update stage" destructive={terminal}
+      description={`${move.app.candidate_name} · ${move.app.requisition_title} (currently ${move.app.status})`} reason
+      reasonLabel={`Reason for ${move.status.toLowerCase()}`} confirmLabel="Update stage" destructive
       onConfirm={async ({ reason, date }) => {
         try {
           await api.post(`/applications/${move.app.id}/status`, { status: move.status, reason, joining_date: date });
@@ -211,17 +214,20 @@ export function MoveDialog({ move, onClose, onDone }) {
 }
 
 export function SelectionDialog({ open, onOpenChange, app, onDone }) {
+  const { user } = useAuth();
   const fields = [
     { name: "decision", label: "Final Decision", type: "select", options: opts(["Selected", "Rejected", "On Hold"]), required: true, allowNone: false },
-    { name: "decision_maker", label: "Decision Maker" },
-    { name: "selection_date", label: "Selection Date", type: "date" },
-    { name: "compensation", label: "Selected Compensation (₹ L)", type: "number" },
+    { name: "decision_maker", label: "Decision Maker", required: true },
+    { name: "selection_date", label: "Selection Date", type: "date", required: true, max: new Date().toISOString().slice(0, 10) },
+    { name: "compensation", label: "Selected Compensation (₹ L) — required when Selected", type: "number" },
     { name: "approval_status", label: "Approval Status", type: "select", options: opts(["Pending", "Approved", "Rejected"]), default: "Pending" },
     { name: "remarks", label: "Remarks (required for reject / hold)", type: "textarea" },
+    ...(user.role === "super_admin" ? [{ name: "override_reason", label: "Exception — select without the required interviews (Super Admin, reason)", type: "textarea", full: true,
+      help: "Leave blank for a normal selection. Filled in, it records an audited interview waiver." }] : []),
   ];
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title="Record selection decision" description={app ? `${app.candidate_name} · ${app.requisition_title}` : ""} wide
-      fields={fields} testid="selection-form" submitLabel="Record decision"
+      fields={fields} initial={{ decision: "Selected", decision_maker: user.name, selection_date: new Date().toISOString().slice(0, 10), approval_status: "Pending" }} testid="selection-form" submitLabel="Record decision"
       onSubmit={async (v) => { try { await api.post("/selections", { ...v, application_id: app.id }); toast.success("Decision recorded"); onOpenChange(false); onDone?.(); } catch (e) { toast.error(errMsg(e)); } }} />
   );
 }

@@ -35,11 +35,14 @@ function Applications({ c, reload }) {
               <p className="font-mono text-[11px] text-zinc-400">{a.code} · {a.requisition_code}</p>
               <Link to={`/requisitions/${a.requisition_id}`} className="text-base font-semibold text-zinc-900 hover:underline">{a.requisition_title}</Link>
               <p className="text-xs text-zinc-500">{a.department || "—"} · Recruiter {a.recruiter || "—"} · {a.days_in_stage} day(s) in stage {a.stuck && <b className="text-amber-700">· stuck</b>}</p>
+              {a.status === "Joined" && <p className="mt-1 text-xs" data-testid={`application-cost-${a.code}`}>Recruitment cost: {a.cost_status
+                ? <b className="text-zinc-700">{a.cost_status}</b> : <b className="text-amber-700">not reconciled</b>}</p>}
+              {a.interview_waiver && <p className="mt-1 text-xs text-amber-800">Interviews waived by {a.interview_waiver.by}: {a.interview_waiver.reason}</p>}
             </div>
             <div className="flex items-center gap-2"><StatusBadge status={a.status} testid={`application-status-${a.code}`} /><AppActions app={a} onDone={reload} /></div>
           </div>
           <div className="mt-4 border-t border-zinc-100 pt-4">
-            <Timeline items={[...(a.history || [])].reverse().map((h) => ({ title: h.from ? `${h.from} → ${h.status}` : h.status, details: [h.reason, h.note].filter(Boolean).join(" · "), meta: `${h.by}${h.auto ? " (automatic)" : ""} · ${fmtDateTime(h.at)}` }))} />
+            <Timeline items={[...(a.history || [])].reverse().map((h) => ({ title: h.from ? `${h.from} → ${h.status}` : h.status, details: [h.reason, h.note, h.override && `EXCEPTION: ${h.override_reason}`].filter(Boolean).join(" · "), meta: `${h.by}${h.auto ? " (automatic)" : ""} · ${fmtDateTime(h.at)}` }))} />
           </div>
         </Section>
       ))}

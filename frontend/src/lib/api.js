@@ -49,7 +49,7 @@ export function errMsg(e) {
   if (!d) return e?.message || "Something went wrong";
   if (typeof d === "string") return d;
   if (Array.isArray(d)) return d.map((x) => x?.msg || JSON.stringify(x)).join(" ");
-  if (d.message) return d.message;
+  if (d.message) return d.detail ? `${d.message}: ${d.detail}` : d.message;
   return String(d);
 }
 

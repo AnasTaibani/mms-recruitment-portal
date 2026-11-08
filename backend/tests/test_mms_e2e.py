@@ -7,7 +7,8 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN = {"email": "anastaibani53@gmail.com", "password": "MMS@Admin2026"}
+ADMIN = {"email": os.environ.get("ADMIN_EMAIL", "anastaibani53@gmail.com").lower(), "password": os.environ.get("ADMIN_PASSWORD", "MMS@Admin2026")}
+ROLE = {"hr_admin": "recruiter", "hiring_manager": "management"}  # retired roles map to the 4 current personas
 PW = "TestPass@123"
 S = {}  # shared state across ordered tests
 
@@ -16,6 +17,8 @@ def sess(email=None, password=PW):
     s = requests.Session()
     r = s.post(f"{API}/auth/login", json={"email": email or ADMIN["email"], "password": password if email else ADMIN["password"]})
     assert r.status_code == 200, r.text
+    if r.json().get("access_token"):  # cookies are Secure; over plain http the Bearer token is used (same as the deployed app)
+        s.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
     return s
 
 
@@ -52,7 +55,7 @@ class TestAuth:
 class TestUsers:
     def test_create_users_each_role(self, admin):
         for role in ["hr_admin", "recruiter", "hiring_manager", "interviewer", "management"]:
-            r = admin.post(f"{API}/users", json={"email": f"test_{role}@mms.test", "name": f"TEST_{role}", "role": role, "password": PW})
+            r = admin.post(f"{API}/users", json={"email": f"test_{role}@mms.test", "name": f"TEST_{role}", "role": ROLE.get(role, role), "password": PW})
             assert r.status_code == 200, r.text
             S[f"user_{role}"] = r.json()["id"]
         r = admin.post(f"{API}/users", json={"email": "test_interviewer2@mms.test", "name": "TEST_interviewer2", "role": "interviewer", "password": PW})

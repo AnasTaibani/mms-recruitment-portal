@@ -9,6 +9,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 from pydantic import BaseModel
 
+from workflow import reached_index
 from core import (db, require, now_iso, today, new_id, next_code, log_activity, parse_date, parse_num, get_settings,
                   recount_filled, ALL_STATUSES, INACTIVE, TERMINAL, REQ_STATUSES, INTERVIEW_STATUSES, INTERVIEW_MODES,
                   PAYMENT_STATUSES)
@@ -717,6 +718,7 @@ async def create_app(ctx, cand_id, req, status, remarks, recruiter_id=None, app_
         "id": new_id(), "code": await unique_code("applications", "APP", 5), "candidate_id": cand_id, "requisition_id": req["id"],
         "recruiter_id": recruiter_id or req.get("recruiter_id"), "status": status, "stage_entered_at": ts, "closed": status in INACTIVE,
         "created_at": f"{app_date}T00:00:00+00:00" if app_date else ts, "updated_at": ts, "created_by": ctx.user["id"], "import_source": ctx.source,
+        "legacy_stage_index": reached_index({"status": status}),  # imported history: earlier stages are accepted as historical, never fabricated
         "history": [{"status": status, "from": None, "at": ts, "by": ctx.user["name"], "reason": remarks or "", "auto": False, "note": "Imported from Excel"}]})
     if status == "Joined":
         await upsert_joining(ctx, app, join_date, remarks)
@@ -797,6 +799,8 @@ async def w_applications(ctx, d, body):
             changes["recruiter_id"] = recruiter_id
         if d["status"] != app["status"]:
             changes |= {"status": d["status"], "stage_entered_at": ts, "closed": d["status"] in INACTIVE,
+                        "legacy_stage_index": max(app.get("legacy_stage_index", -1) if isinstance(app.get("legacy_stage_index"), int) else -1,
+                                                  reached_index({"status": d["status"]})),
                         "history": app.get("history", []) + [{"status": d["status"], "from": app["status"], "at": ts, "by": ctx.user["name"],
                                                               "reason": d.get("remarks") or "", "auto": False, "note": "Updated by Excel import"}]}
         await ctx.update("applications", app["id"], changes)

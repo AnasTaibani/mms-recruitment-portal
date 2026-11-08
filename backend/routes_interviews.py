@@ -10,6 +10,18 @@ from core import (db, get_user, require, can, now_iso, today, new_id, next_code,
 
 router = APIRouter(prefix="/api")
 OPEN_IV = ["Scheduled", "Rescheduled"]
+
+
+async def sync_interview_stage(app, user, note, records=()):
+    """Keep the application stage in step with its interviews: Interview Completed only when the requisition's
+    required rounds are complete with all feedback; otherwise Interview In Progress."""
+    from workflow import evaluate
+    app = await db.applications.find_one({"id": app["id"]}, {"_id": 0})
+    if app["status"] not in ("Interview Scheduled", "Interview In Progress"):
+        return app
+    steps = await evaluate(app, "Interview Completed")
+    done = all(s["done"] for s in steps if s["blocking"])
+    return await set_app_status(app, "Interview Completed" if done else "Interview In Progress", user, auto=True, note=note, records=list(records))
 RATING_KEYS = ["technical", "communication", "problem_solving", "relevant_experience", "role_fit", "overall"]
 
 
@@ -66,7 +78,8 @@ async def enrich_ivs(ivs, user):
                   "requisition_code": r.get("code"), "department": mm.get(r.get("department_id")),
                   "round_type": mm.get(i.get("round_type_id")),
                   "interviewers": [mm.get(x) for x in i.get("interviewer_ids", [])],
-                  "feedback_count": len(done), "my_pending": list((mine & set(i.get("interviewer_ids", []))) - done)})
+                  "feedback_count": len(done), "my_pending": list((mine & set(i.get("interviewer_ids", []))) - done),
+                  "feedback_pending": [x for x in i.get("interviewer_ids", []) if x not in done]})
     return ivs
 
 
@@ -103,6 +116,8 @@ async def schedule_interview(body: InterviewIn, user=Depends(require("interview.
         raise HTTPException(400, f"Application is {app['status']} — interviews cannot be scheduled")
     if not data.get("date") or not data.get("interviewer_ids") or not data.get("round_name"):
         raise HTTPException(400, "Round name, date and at least one interviewer are required")
+    from workflow import assert_prerequisites
+    await assert_prerequisites(app, "Interview Scheduled", keys={"screening", "shortlisting"})
     validate_slot(data)
     clash = await conflicts(data["interviewer_ids"], data["date"], data.get("start_time"), data.get("end_time"))
     if clash and not force:
@@ -120,7 +135,7 @@ async def schedule_interview(body: InterviewIn, user=Depends(require("interview.
     await log_activity(user, "interview_schedule", "application", app["id"], f"{cand['name']} · {doc['code']}",
                        f"Round {doc['round_number']} {doc['round_name']} on {doc['date']}" + (" (conflict overridden)" if clash else ""))
     if app["status"] in ("New", "Screening", "Shortlisted", "Interview Completed", "On Hold"):
-        await set_app_status(app, "Interview Scheduled", user, auto=True, note=doc["code"])
+        await set_app_status(app, "Interview Scheduled", user, auto=True, note=doc["code"], records=[doc["id"]])
     targets = []
     for i in data["interviewer_ids"]:
         targets += await user_ids_for_person(i)
@@ -192,6 +207,7 @@ class IvStatusIn(BaseModel):
     status: Optional[str] = None
     outcome: Optional[str] = None
     reason: Optional[str] = None
+    override_reason: Optional[str] = None  # Super Admin: complete without all feedback (audited)
 
 
 @router.post("/interviews/{iid}/status")
@@ -207,17 +223,32 @@ async def interview_status(iid: str, body: IvStatusIn, user=Depends(get_user)):
             raise HTTPException(400, "Reason is required")
         if iv["status"] in ("Cancelled", "Completed", "No Show") and body.status != iv["status"]:
             raise HTTPException(400, f"Interview is already {iv['status']}")
+        if body.status == "Completed" and iv["status"] != "Completed":
+            given = {f["interviewer_id"] async for f in db.feedback.find({"interview_id": iid}, {"interviewer_id": 1})}
+            missing = [i for i in iv.get("interviewer_ids", []) if i not in given]
+            if missing:
+                from workflow import is_override_user
+                if not (body.override_reason or "").strip():
+                    mm = await masters_map()
+                    raise HTTPException(400, f"Feedback is missing from {', '.join(mm.get(i) or i for i in missing)} — submit it before completing the interview")
+                if not is_override_user(user):
+                    raise HTTPException(403, "Only a Super Admin can complete an interview without all feedback")
+                upd["feedback_override"] = {"reason": body.override_reason.strip(), "by": user["name"], "at": now_iso(), "missing": missing}
         upd["status"] = body.status
     if body.outcome:
         if body.outcome not in ("Pending", "Selected", "Rejected", "On Hold"):
             raise HTTPException(400, "Invalid outcome")
         upd["outcome"] = body.outcome
+    if body.outcome and body.outcome != "Pending" and (body.status or iv["status"]) != "Completed":
+        raise HTTPException(400, "Record the final recommendation once the interview is completed")
     action = " / ".join(x for x in (body.status, body.outcome and f"Outcome {body.outcome}") if x)
+    if upd.get("feedback_override"):
+        action += f" [EXCEPTION: completed without all feedback — {body.override_reason}]"
     await db.interviews.update_one({"id": iid}, {"$set": upd, "$push": {"history": {"at": now_iso(), "by": user["name"], "action": action, "details": body.reason or ""}}})
     await log_activity(user, "interview_status", "application", iv["application_id"], iv["code"], action + (f" ({body.reason})" if body.reason else ""))
     app = await db.applications.find_one({"id": iv["application_id"]}, {"_id": 0})
-    if body.status == "Completed" and app["status"] in ("Interview Scheduled", "Interview In Progress"):
-        await set_app_status(app, "Interview Completed", user, auto=True, note=iv["code"])
+    if body.status == "Completed" or body.outcome:
+        await sync_interview_stage(app, user, iv["code"], [iid])
     if body.status == "No Show" and app["status"] in ("Interview Scheduled", "Interview In Progress"):
         await set_app_status(app, "No Show", user, reason=body.reason, auto=True, note=iv["code"])
     return await get_interview(iid, user)
@@ -257,11 +288,10 @@ async def submit_feedback(iid: str, body: FeedbackIn, user=Depends(require("feed
            "ratings": {k: body.ratings[k] for k in RATING_KEYS}, "scale": scale, "recommendation": body.recommendation,
            "detailed": body.detailed, "strengths": body.strengths, "improvements": body.improvements,
            "submitted_by": user["name"], "submitted_at": now_iso()}
-    existing = await db.feedback.find_one({"interview_id": iid, "interviewer_id": ivr})
-    if existing:
-        await db.feedback.update_one({"_id": existing["_id"]}, {"$set": doc})
-    else:
-        await db.feedback.insert_one(doc | {"id": new_id()})
+    if await db.feedback.find_one({"interview_id": iid, "interviewer_id": ivr}):
+        mm = await masters_map()
+        raise HTTPException(409, f"Feedback from {mm.get(ivr) or 'this interviewer'} has already been submitted for {iv['code']}")
+    await db.feedback.insert_one(doc | {"id": new_id()})
     count = await db.feedback.count_documents({"interview_id": iid})
     total = len(iv["interviewer_ids"])
     upd = {"feedback_status": "Complete" if count >= total else "Partial", "updated_at": now_iso()}
@@ -272,9 +302,7 @@ async def submit_feedback(iid: str, body: FeedbackIn, user=Depends(require("feed
     await log_activity(user, "feedback_submit", "application", iv["application_id"], iv["code"],
                        f"{mm.get(ivr)}: {body.recommendation} (overall {body.ratings['overall']}/{scale})")
     app = await db.applications.find_one({"id": iv["application_id"]}, {"_id": 0})
-    if app["status"] in ("Interview Scheduled", "Interview In Progress"):
-        await set_app_status(app, "Interview Completed" if upd.get("status") == "Completed" else "Interview In Progress",
-                             user, auto=True, note=iv["code"])
+    await sync_interview_stage(app, user, iv["code"], [iid])
     await notify(await user_ids_for_person(app.get("recruiter_id")), "feedback", "Interview feedback submitted",
                  f"{iv['code']} · {mm.get(ivr)}: {body.recommendation}", f"/candidates/{iv['candidate_id']}")
     return await get_interview(iid, user)

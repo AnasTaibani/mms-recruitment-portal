@@ -228,28 +228,46 @@ async def get_settings():
     return s or {}
 
 
-async def set_app_status(app, status, user, reason=None, auto=False, note=""):
+# Stages that only exist because a record exists (selection / offer / joining) — never set by override
+RECORD_BACKED = {"Selected", "Offer Approval Pending", "Offer Released", "Offer Accepted", "Joined"}
+
+
+async def set_app_status(app, status, user, reason=None, auto=False, note="", override_reason=None, check=True, records=None):
+    """Single entry point for every stage change. User moves follow the transition matrix; every move into a
+    pipeline stage (user or automatic) must satisfy that stage's prerequisite records (see workflow.py)."""
+    from workflow import allowed_targets, assert_prerequisites, is_override_user, IDX
     if status not in ALL_STATUSES:
         raise HTTPException(400, "Unknown status")
     if status == app["status"]:
         return app
-    if not auto:
+    override = bool((override_reason or "").strip())
+    if override:
+        if not is_override_user(user):
+            raise HTTPException(403, "Only a Super Admin can make an exception to the workflow")
+        if status in RECORD_BACKED:
+            raise HTTPException(400, f"{status} needs its own record — complete it through the stage wizard instead of an override")
+    if not auto and status in ("Offer Declined", "Offer Revoked"):
+        raise HTTPException(400, f"{status} is recorded on the offer itself — use the offer's {'Decline' if status == 'Offer Declined' else 'Revoke'} action")
+    if not auto and not override:
         if app["status"] == "Joined":
             raise HTTPException(400, "Joined applications are closed")
-        trans = (await get_settings()).get("transitions", {})
-        if status not in trans.get(app["status"], ALL_STATUSES):
+        if status not in await allowed_targets(app):
             raise HTTPException(400, f"Transition {app['status']} → {status} is not permitted")
-        if status in TERMINAL and not (reason or "").strip():
-            raise HTTPException(400, "A reason is required for this status")
+    if status in TERMINAL and not auto and not (reason or "").strip():
+        raise HTTPException(400, "A reason is required for this status")
+    if check and not override and status in IDX:
+        await assert_prerequisites(app, status)
     ts = now_iso()
     entry = {"status": status, "from": app["status"], "at": ts, "by": user["name"] if user else "System",
-             "reason": reason or "", "auto": auto, "note": note}
+             "by_id": user["id"] if user else None, "reason": reason or "", "auto": auto, "note": note,
+             "override": override, "override_reason": override_reason or "", "records": list(records or [])}
     upd = {"status": status, "stage_entered_at": ts, "updated_at": ts, "closed": status in INACTIVE}
     await db.applications.update_one({"id": app["id"]}, {"$set": upd, "$push": {"history": entry}})
     cand = await db.candidates.find_one({"id": app["candidate_id"]}, {"name": 1})
     label = f"{cand['name'] if cand else ''} · {app.get('code', '')}"
-    await log_activity(user, "status_change", "application", app["id"], label,
-                       f"{app['status']} → {status}" + (f" ({reason})" if reason else "") + (" [auto]" if auto else ""))
+    await log_activity(user, "status_override" if override else "status_change", "application", app["id"], label,
+                       f"{app['status']} → {status}" + (f" ({reason})" if reason else "") + (" [auto]" if auto else "")
+                       + (f" [EXCEPTION: {override_reason}]" if override else "") + (f" [records: {', '.join(records)}]" if records else ""))
     targets = await user_ids_for_person(app.get("recruiter_id"))
     if user:
         targets = [t for t in targets if t != user["id"]]

@@ -13,7 +13,7 @@ from core import (db, get_user, require, can, today, days_between, effective_sta
                   IMPLIED_STAGE, INACTIVE)
 from routes_recruit import list_applications, list_requisitions, list_candidates
 from routes_interviews import list_interviews
-from routes_offers import list_offers, list_joinings, list_costs, hire_ctc
+from routes_offers import list_offers, list_joinings, list_costs
 
 router = APIRouter(prefix="/api")
 FUNNEL = [("Candidates Sourced", 0), ("Screening", 1), ("Shortlisted", 2), ("Interviewed", 4), ("Selected", 6),
@@ -214,14 +214,12 @@ async def compute(user, f):
                 "joined": len(hires_rows), "conversion": pct(len(hires_rows), len(rows)),
                 "avg_cycle": stats([a["_cycle"] for a in hires_rows])["avg"]}
 
-    # Cost per hire = (CTC of each joined candidate + all consultancy / recruiter fees) ÷ number of joiners
-    ctc_map = await hire_ctc({a["candidate_id"] for a in hires}) if costs is not None else {}
-
+    # Cost per hire = (recruiter fees + recruitment partner / consultancy fees) ÷ candidates joined.
+    # Candidate CTC is never a recruitment cost. Costs and joiners use the same date / department / role / recruiter filters.
     def cost_for(field, key, hire_rows=()):
         if costs is None:
             return None
-        fees = sum(c["amount"] or 0 for c in costs if c.get(field) == key)
-        return round(fees + sum(ctc_map.get(a["candidate_id"]) or 0 for a in hire_rows), 2)
+        return round(sum(c.get("amount") or 0 for c in costs if c.get(field) == key), 2)
 
     recruiters = []
     hg = group(lambda a: a.get("recruiter_id"), hires)
@@ -271,19 +269,17 @@ async def compute(user, f):
 
     cost = None
     if costs is not None:
-        fees = round(sum(c["amount"] or 0 for c in costs), 2)
-        ctc_total = round(sum(ctc_map.get(a["candidate_id"]) or 0 for a in hires), 2)
-        total = round(fees + ctc_total, 2)
+        total = round(sum(c.get("amount") or 0 for c in costs), 2)
         cats = defaultdict(float)
-        if ctc_total:
-            cats["Candidate CTC (joined)"] = ctc_total
         months = defaultdict(float)
         for c in costs:
-            cats[c.get("category") or "Uncategorised"] += c["amount"] or 0
-            months[(c.get("invoice_date") or "")[:7]] += c["amount"] or 0
-        cost = {"total": total, "fees": fees, "ctc_total": ctc_total, "hires": len(hires),
-                "ctc_missing": sum(1 for a in hires if ctc_map.get(a["candidate_id"]) is None),
+            cats[c.get("category") or "Uncategorised"] += c.get("amount") or 0
+            months[(c.get("invoice_date") or "")[:7]] += c.get("amount") or 0
+        cost = {"total": total, "fees": total, "hires": len(hires),
                 "cost_per_hire": round(total / len(hires), 2) if hires else None,
+                "amount_pending": sum(1 for c in costs if c.get("amount") is None),
+                "reconciliation": {s: sum(1 for a in hires if a.get("cost_status") == s) for s in ("Cost Recorded", "Invoice Pending", "No Recruitment Cost")}
+                                  | {"Not reconciled": sum(1 for a in hires if not a.get("cost_status"))},
                 "by_category": [{"category": k, "amount": round(v, 2)} for k, v in cats.items()],
                 "by_month": [{"month": k, "amount": round(v, 2)} for k, v in sorted(months.items()) if k],
                 "paid": round(sum(c["amount"] or 0 for c in costs if c.get("payment_status") == "Paid"), 2)}
@@ -292,7 +288,8 @@ async def compute(user, f):
         return [{"name": k or "—", **stats([a["_cycle"] for a in rows])} for k, rows in group(lambda a: a.get(key), hires).items()]
 
     active = [a for a in apps if a["_age"] is not None]
-    cycle = {"completed": stats([a["_cycle"] for a in hires]), "current_age": stats([a["_age"] for a in active]),
+    cycle = {"label": "Recruitment cycle time — from the earlier of CRF Raised / Recruitment Initiation Date (not Age per Hire)",
+             "completed": stats([a["_cycle"] for a in hires]), "current_age": stats([a["_age"] for a in active]),
              "by_role": cycle_by("requisition_title"), "by_department": cycle_by("department"),
              "by_recruiter": cycle_by("recruiter"), "by_source": cycle_by("source"),
              "hires": [{"candidate": a["candidate_name"], "role": a["requisition_title"], "joined_on": a["_join"], "days": a["_cycle"]} for a in hires],

@@ -25,7 +25,7 @@ export default function Login() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#EEF5FF] via-white to-[#E3EFFD] p-4">
+    <div className="login-theme relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#EEF5FF] via-white to-[#E3EFFD] p-4">
       {/* soft brand-blue shapes, echoing the butterfly mark */}
       <div className="pointer-events-none absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-[#67B3F2]/30 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 -right-24 h-[32rem] w-[32rem] rounded-full bg-[#1E63CE]/20 blur-3xl" />

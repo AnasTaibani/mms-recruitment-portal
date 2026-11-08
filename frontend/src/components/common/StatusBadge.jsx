@@ -4,10 +4,10 @@ const TONES = {
   green: "bg-emerald-50 text-emerald-800 border-emerald-200 [&>i]:bg-emerald-500",
   amber: "bg-amber-50 text-amber-800 border-amber-200 [&>i]:bg-amber-500",
   rose: "bg-rose-50 text-rose-800 border-rose-200 [&>i]:bg-rose-500",
-  plum: "bg-purple-50 text-purple-800 border-purple-200 [&>i]:bg-purple-500",
+  plum: "bg-stone-100 text-stone-700 border-stone-300 [&>i]:bg-stone-500",
   zinc: "bg-zinc-100 text-zinc-700 border-zinc-200 [&>i]:bg-zinc-400",
   orange: "bg-orange-50 text-orange-800 border-orange-200 [&>i]:bg-orange-500",
-  dark: "bg-[#1E63CE] text-white border-[#1E63CE] [&>i]:bg-white",
+  dark: "bg-[#18181B] text-white border-[#18181B] [&>i]:bg-white",
 };
 
 const MAP = {

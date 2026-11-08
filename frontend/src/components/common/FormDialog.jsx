@@ -47,7 +47,7 @@ export function MultiSelect({ value = [], onChange, options, placeholder = "Sele
             return (
               <button type="button" key={o.value} data-testid={`${testid}-opt-${o.label}`} onClick={() => onChange(on ? value.filter((v) => v !== o.value) : [...value, o.value])}
                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100">
-                <span className={cn("flex h-4 w-4 items-center justify-center rounded border", on ? "border-[#1E63CE] bg-[#1E63CE] text-white" : "border-zinc-300")}>{on && <Check className="h-3 w-3" />}</span>
+                <span className={cn("flex h-4 w-4 items-center justify-center rounded border", on ? "border-[#18181B] bg-[#18181B] text-white" : "border-zinc-300")}>{on && <Check className="h-3 w-3" />}</span>
                 {o.label}{o.hint && <span className="ml-auto text-[11px] text-zinc-400">{o.hint}</span>}
               </button>
             );

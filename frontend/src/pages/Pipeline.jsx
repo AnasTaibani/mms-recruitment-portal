@@ -4,6 +4,7 @@ import { AlertTriangle, Download, KanbanSquare, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/lib/useFetch";
+import { useUrlDefaults } from "@/lib/urlFilters";
 import { PageHeader } from "@/components/common/Page";
 import { DataTable } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -52,7 +53,7 @@ function Board({ apps, reload }) {
           const term = meta.terminal.includes(s);
           return (
             <div key={s} onDragOver={(e) => { e.preventDefault(); setOver(s); }} onDragLeave={() => setOver(null)} onDrop={(e) => drop(s, e)} data-testid={`kanban-col-${s.toLowerCase().replace(/ /g, "-")}`}
-              className={cn("flex w-64 shrink-0 flex-col rounded-xl border p-2 transition-colors", term ? "border-zinc-200 bg-zinc-100/60" : "border-zinc-200 bg-zinc-50", over === s && "border-[#1E63CE] bg-zinc-100")}>
+              className={cn("flex w-64 shrink-0 flex-col rounded-xl border p-2 transition-colors", term ? "border-zinc-200 bg-zinc-100/60" : "border-zinc-200 bg-zinc-50", over === s && "border-[#18181B] bg-zinc-100")}>
               <div className="mb-2 flex items-center justify-between px-1.5 py-1">
                 <StatusBadge status={s} /><span className="text-xs font-semibold text-zinc-500">{items.length}</span>
               </div>
@@ -68,8 +69,9 @@ function Board({ apps, reload }) {
 
 export default function Pipeline() {
   const { list, meta, can } = useAuth();
-  const [f, setF] = useState({ slim: "true" });
-  const [view, setView] = useState("board");
+  const init = useUrlDefaults({ slim: "true" }, ["status", "recruiter_id", "requisition_id"]);
+  const [f, setF] = useState(init);
+  const [view, setView] = useState(init.status || init.recruiter_id ? "table" : "board");
   const { data, loading, reload } = useFetch("/applications", f);
   const { data: reqs } = useFetch("/requisitions");
   const m = (t) => list(t).map((x) => ({ value: x.id, label: x.name }));
@@ -103,7 +105,8 @@ export default function Pipeline() {
         {sel("recruiter_id", m("recruiter"), "All recruiters")}
         {sel("department_id", m("department"), "All departments")}
         {sel("source_id", m("source"), "All sources")}
-        {sel("status", [...meta.pipeline, ...meta.terminal].map((s) => ({ value: s, label: s })), "All stages")}
+        {sel("status", [...(f.status?.includes(",") ? [{ value: f.status, label: f.status.split(",").length === 3 && f.status.startsWith("Interview") ? "Interview stages" : f.status.replace(/,/g, " / ") }] : []),
+          ...[...meta.pipeline, ...meta.terminal].map((s) => ({ value: s, label: s }))], "All stages")}
         {stuck > 0 && <span className="ml-auto flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800" data-testid="stuck-alert"><AlertTriangle className="h-3.5 w-3.5" />{stuck} stuck over {meta.settings.stale_days} days</span>}
       </div>
       {loading ? <p className="text-sm text-zinc-400">Loading pipeline…</p> : view === "board" ? <Board apps={apps} reload={reload} /> : <DataTable testid="pipe-table" columns={cols} data={apps} />}

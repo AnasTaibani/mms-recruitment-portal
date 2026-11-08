@@ -68,7 +68,7 @@ export function AphTrend({ aph, height = 220 }) {
           <LineChart data={data} margin={{ left: 0, right: 8 }}>
             <CartesianGrid stroke="#F4F4F5" /><XAxis dataKey="period" tick={axis} /><YAxis tick={axis} allowDecimals={false} unit=" d" width={48} />
             <Tooltip formatter={(v, n) => [`${v} days`, n === "avg" ? "Average" : "Median"]} labelFormatter={(l) => `${l}`} />
-            <Line dataKey="avg" name="avg" stroke="#1E63CE" strokeWidth={2} dot />
+            <Line dataKey="avg" name="avg" stroke="#18181B" strokeWidth={2} dot />
             <Line dataKey="median" name="median" stroke="#D97706" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
           </LineChart>
         </ResponsiveContainer>)}
@@ -82,7 +82,7 @@ export function AphKpis({ aph }) {
   const c = aph.completed;
   return (
     <div className="grid gap-3 sm:grid-cols-3">
-      <div className="rounded-xl border border-[#1E63CE] bg-white p-4" data-testid="kpi-age-per-hire">
+      <div className="rounded-xl border border-[#18181B] bg-white p-4" data-testid="kpi-age-per-hire">
         <p className="eyebrow">Age per Hire (avg)</p>
         <p className="mt-2 text-3xl font-extrabold tracking-tight text-zinc-900">{c.avg === null ? "N/A" : <>{c.avg}<span className="ml-1 text-base font-semibold text-zinc-500">days</span></>}</p>
         <p className="mt-1 text-[11px] text-zinc-400">Median {d(c.median)} · Min {d(c.min)} · Max {d(c.max)} · {c.count} hire{c.count === 1 ? "" : "s"}</p>

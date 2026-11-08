@@ -171,7 +171,7 @@ export function FeedbackDialog({ open, onOpenChange, interview, onDone }) {
               <div className="flex gap-1">
                 {[...Array(scale)].map((_, i) => (
                   <button type="button" key={i} onClick={() => setR({ ...r, [k]: i + 1 })} data-testid={`rating-${k}-${i + 1}`}
-                    className={cn("h-8 w-8 rounded-md border text-xs font-semibold transition-colors", r[k] >= i + 1 ? "border-[#1E63CE] bg-[#1E63CE] text-white" : "border-zinc-200 hover:border-zinc-400")}>{i + 1}</button>
+                    className={cn("h-8 w-8 rounded-md border text-xs font-semibold transition-colors", r[k] >= i + 1 ? "border-[#18181B] bg-[#18181B] text-white" : "border-zinc-200 hover:border-zinc-400")}>{i + 1}</button>
                 ))}
               </div>
             </div>
@@ -180,7 +180,7 @@ export function FeedbackDialog({ open, onOpenChange, interview, onDone }) {
         <div className="space-y-1.5"><Label className="text-xs">Recommendation *</Label>
           <div className="flex flex-wrap gap-2">{meta.recommendations.map((x) => (
             <button type="button" key={x} onClick={() => setRec(x)} data-testid={`recommend-${x.toLowerCase().replace(" ", "-")}`}
-              className={cn("rounded-full border px-3 py-1 text-xs font-semibold", rec === x ? "border-[#1E63CE] bg-[#1E63CE] text-white" : "border-zinc-200")}>{x}</button>))}</div></div>
+              className={cn("rounded-full border px-3 py-1 text-xs font-semibold", rec === x ? "border-[#18181B] bg-[#18181B] text-white" : "border-zinc-200")}>{x}</button>))}</div></div>
         {[["detailed", "Detailed Feedback *"], ["strengths", "Strengths"], ["improvements", "Areas of Improvement"]].map(([k, l]) => (
           <div key={k} className="space-y-1.5"><Label className="text-xs">{l}</Label><Textarea rows={k === "detailed" ? 4 : 2} value={text[k]} onChange={(e) => setText({ ...text, [k]: e.target.value })} data-testid={`feedback-${k}`} /></div>
         ))}

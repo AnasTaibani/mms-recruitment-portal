@@ -414,7 +414,7 @@ async def list_applications(user, f):
     q = dict(scope.q("app"))
     for k in ("requisition_id", "candidate_id", "recruiter_id", "status"):
         if f.get(k):
-            q[k] = f[k]
+            q[k] = {"$in": f[k].split(",")} if k == "status" and "," in f[k] else f[k]
     if f.get("active") == "true":
         q["closed"] = False
     apps = await db.applications.find(q, {"_id": 0}).sort("updated_at", -1).to_list(10000)

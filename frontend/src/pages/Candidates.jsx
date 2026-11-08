@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/lib/useFetch";
+import { useUrlDefaults } from "@/lib/urlFilters";
 import { PageHeader } from "@/components/common/Page";
 import { DataTable } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -16,7 +17,7 @@ import { download, lakhs, fmtDate } from "@/lib/api";
 export default function Candidates() {
   const { can, list, meta } = useAuth();
   const nav = useNavigate();
-  const [f, setF] = useState({});
+  const [f, setF] = useState(useUrlDefaults({}, ["source_id", "status", "recruiter_id", "partner_id"]));
   const [open, setOpen] = useState(false);
   const { data, loading, reload } = useFetch("/candidates", f);
   const m = (t) => list(t).map((x) => ({ value: x.id, label: x.name }));

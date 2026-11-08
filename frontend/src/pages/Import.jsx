@@ -122,7 +122,7 @@ export default function ImportPage() {
         {step === 0 && <Templates />}
 
         <div>
-          <div className="mb-4 flex flex-wrap gap-2">{STEPS.map((x, i) => <span key={x} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", i === step ? "border-[#1E63CE] bg-[#1E63CE] text-white" : i < step ? "border-zinc-300 bg-white text-zinc-700" : "border-zinc-200 text-zinc-400")}>{i + 1}. {x}</span>)}</div>
+          <div className="mb-4 flex flex-wrap gap-2">{STEPS.map((x, i) => <span key={x} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", i === step ? "border-[#18181B] bg-[#18181B] text-white" : i < step ? "border-zinc-300 bg-white text-zinc-700" : "border-zinc-200 text-zinc-400")}>{i + 1}. {x}</span>)}</div>
 
           {step === 0 && (
             <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-white py-14 hover:border-zinc-500" data-testid="import-dropzone">

@@ -11,7 +11,7 @@ import { useFetch } from "@/lib/useFetch";
 import { Kpi, PageHeader, Section } from "@/components/common/Page";
 import { DataTable, EmptyState } from "@/components/common/DataTable";
 import { SelectField } from "@/components/common/FormDialog";
-import { COLORS, FunnelChart, KpiGrid, axis } from "@/pages/Dashboard";
+import { COLORS, FunnelChart, KpiGrid, axis } from "@/components/analytics/shared";
 import { download, lakhs, num } from "@/lib/api";
 
 const n = (v, s = "") => (v === null || v === undefined ? "N/A" : `${v}${s}`);
@@ -75,7 +75,7 @@ export default function Analytics() {
           <KpiGrid k={d.kpis} cost={can("cost.view") ? d.cost : undefined} aph={d.aph} cycle={d.cycle} />
           <Section title="Monthly hiring trends">
             {!d.trends.length ? <EmptyState title="No trend data" /> : <ResponsiveContainer width="100%" height={260}><LineChart data={d.trends}><CartesianGrid stroke="#F4F4F5" /><XAxis dataKey="month" tick={axis} /><YAxis tick={axis} allowDecimals={false} /><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line dataKey="applications" stroke="#1E63CE" strokeWidth={2} /><Line dataKey="offers" stroke="#D97706" strokeWidth={2} /><Line dataKey="joined" stroke="#059669" strokeWidth={2} /></LineChart></ResponsiveContainer>}
+              <Line dataKey="applications" stroke="#18181B" strokeWidth={2} /><Line dataKey="offers" stroke="#D97706" strokeWidth={2} /><Line dataKey="joined" stroke="#059669" strokeWidth={2} /></LineChart></ResponsiveContainer>}
           </Section>
         </TabsContent>
         <TabsContent value="aph"><AphDetail aph={d.aph} f={f} canExport={can("reports.export")} /></TabsContent>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/lib/useFetch";
+import { useUrlDefaults } from "@/lib/urlFilters";
 import { PageHeader } from "@/components/common/Page";
 import { DataTable } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -32,7 +33,7 @@ export function ReqForm({ open, onOpenChange, initial, onSaved }) {
 export default function Requisitions() {
   const { can, list, meta } = useAuth();
   const nav = useNavigate();
-  const [f, setF] = useState({});
+  const [f, setF] = useState(useUrlDefaults({}, ["status", "department_id"]));
   const [open, setOpen] = useState(false);
   const { data, loading, reload } = useFetch("/requisitions", f);
   const flt = (k, opts, ph) => <SelectField value={f[k]} onChange={(v) => setF({ ...f, [k]: v })} options={opts} placeholder={ph} testid={`req-filter-${k}`} className="w-40" />;

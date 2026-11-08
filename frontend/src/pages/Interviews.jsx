@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/lib/useFetch";
+import { useUrlDefaults } from "@/lib/urlFilters";
 import { Info, PageHeader, Timeline } from "@/components/common/Page";
 import { DataTable } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -81,7 +82,7 @@ function Detail({ id, onClose, onChanged }) {
 
 export default function Interviews() {
   const { meta, list, can, user } = useAuth();
-  const [f, setF] = useState({ mine: can("interview.manage") ? "" : "true" });
+  const [f, setF] = useState(useUrlDefaults({ mine: can("interview.manage") ? "" : "true" }, ["status", "feedback_status"]));
   const [sel, setSel] = useState(null);
   const { data, loading, reload } = useFetch("/interviews", f);
   const cols = [

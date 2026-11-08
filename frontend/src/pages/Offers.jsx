@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/lib/useFetch";
+import { useUrlDefaults } from "@/lib/urlFilters";
 import { Info, PageHeader, Timeline } from "@/components/common/Page";
 import { DataTable } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -70,7 +71,7 @@ function OfferDetail({ offer, onClose, onChanged }) {
 
 export default function Offers() {
   const { meta, can } = useAuth();
-  const [f, setF] = useState({});
+  const [f, setF] = useState(useUrlDefaults({}, ["status"]));
   const [sel, setSel] = useState(null);
   const { data, loading, reload } = useFetch("/offers", f);
   const current = sel && (data || []).find((o) => o.id === sel);
@@ -92,7 +93,7 @@ export default function Offers() {
     <div>
       <PageHeader eyebrow="Selection & offers" title="Offers" description="Draft → approval → release → acceptance. Create offers from a selected candidate's application."
         actions={can("reports.export") && <Button variant="outline" onClick={() => download("/reports/offers", f)} data-testid="offer-export-btn"><Download className="mr-2 h-4 w-4" />Export</Button>} />
-      {pending > 0 && <p className="mb-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-sm text-purple-900" data-testid="offer-pending-alert">{pending} offer(s) awaiting approval</p>}
+      {pending > 0 && <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900" data-testid="offer-pending-alert">{pending} offer(s) awaiting approval</p>}
       <DataTable testid="offer-table" columns={cols} data={data} loading={loading} onRowClick={(o) => setSel(o.id)} emptyHint="Offers appear here once created for a selected candidate."
         toolbar={<SelectField value={f.status} onChange={(v) => setF({ ...f, status: v })} options={meta.offer_statuses.map((s) => ({ value: s, label: s }))} placeholder="All statuses" testid="offer-filter-status" className="w-44" />} />
       <OfferDetail offer={current} onClose={() => setSel(null)} onChanged={reload} />

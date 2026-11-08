@@ -38,7 +38,7 @@ function Masters() {
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
       <div className="space-y-0.5 rounded-xl border border-zinc-200 bg-white p-2">
         {Object.entries(meta.master_types).map(([k, l]) => (
-          <button key={k} onClick={() => setType(k)} data-testid={`master-type-${k}`} className={cn("flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm", type === k ? "bg-[#1E63CE] text-white" : "hover:bg-zinc-100")}>
+          <button key={k} onClick={() => setType(k)} data-testid={`master-type-${k}`} className={cn("flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm", type === k ? "bg-[#18181B] text-white" : "hover:bg-zinc-100")}>
             {l}<span className="text-[11px] opacity-60">{list(k, true).length}</span></button>))}
       </div>
       <DataTable key={type} testid="master-table" data={rows} toolbar={<Button size="sm" className="h-9" onClick={() => setEdit({})} data-testid="master-add-btn"><Plus className="mr-1.5 h-4 w-4" />Add</Button>}

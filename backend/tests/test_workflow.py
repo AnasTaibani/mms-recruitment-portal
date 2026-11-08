@@ -138,6 +138,8 @@ def test_01_full_progression(admin):
     assert j["status"] == "Pending" and j.get("checklist_status")
     err(admin.post(f"{API}/joinings", json={"application_id": aid}), 409)  # no duplicate joining
     err(admin.put(f"{API}/joinings/{j['id']}", json={"status": "Joined"}), 400, "actual date")
+    err(admin.put(f"{API}/joinings/{j['id']}", json={"status": "Joined", "actual_date": D(1)}), 400, "recruitment cost")
+    ok(admin.put(f"{API}/applications/{aid}/hire-cost", json={"ctc": 18, "consulting_fee": 0, "recruiter_fee": 0}))
     err(admin.put(f"{API}/joinings/{j['id']}", json={"status": "Joined", "actual_date": (TODAY + timedelta(days=3)).isoformat()}), 400, "future")
     ok(admin.put(f"{API}/joinings/{j['id']}", json={"status": "Joined", "actual_date": D(1)}))
     a = app_of(admin, aid)
@@ -243,6 +245,8 @@ def test_07_joined_without_accepted_offer(admin):
 def test_08_joined_invoice_pending(admin):
     cid, aid = S["waived"]
     ok(admin.post(f"{API}/offers/{S['waived_offer']}/action", json={"action": "accept", "date": D(2), "tentative_joining_date": D(1)}))
+    # invoice not in yet: the expected fee is confirmed as part of the cost per hire; the invoice entry follows later
+    ok(admin.put(f"{API}/applications/{aid}/hire-cost", json={"ctc": 18, "consulting_fee": 1.5, "recruiter_fee": 0}))
     ok(admin.post(f"{API}/applications/{aid}/status", json={"status": "Joined", "joining_date": D(1)}))
     assert app_of(admin, aid)["status"] == "Joined"
     c = ok(admin.post(f"{API}/costs", json={"category_id": S["cat"], "partner_name": f"TEST_Partner_{TAG}", "candidate_id": cid}))
@@ -264,16 +268,11 @@ def test_09_no_recruitment_cost(admin):
     err(admin.post(f"{API}/applications/{waived}/cost-status", json={"cost_status": "No Recruitment Cost"}), 400)
 
 
-# Cost per hire = fees only ÷ joined (CTC excluded)
+# Cost per hire = CTC + consulting + recruiter fees per hire; average over joined hires with confirmed cost
 def test_09b_cost_per_hire(admin):
-    ok(admin.post(f"{API}/costs", json={"category_id": S["cat"], "recruiter_id": S["m_rec"], "requisition_id": S["req"],
-                                       "ctc": 18, "fee_percent": 10, "invoice_date": D(0)}))  # fee = 1.8, CTC never counted
     a = ok(admin.get(f"{API}/analytics", params={"requisition_id": S["req"]}))
-    hires = a["kpis"]["joined"]
-    total = sum(c["amount"] or 0 for c in ok(admin.get(f"{API}/costs", params={"requisition_id": S["req"]})))
-    assert hires == 2 and round(total, 2) == 3.3, (hires, total)
-    assert a["cost"]["total"] == 3.3 and a["cost"]["cost_per_hire"] == 1.65
-    assert "ctc_total" not in a["cost"]
+    assert a["kpis"]["joined"] == 2 and a["cost"]["hires"] == 2
+    assert a["cost"]["total"] == 37.5 and a["cost"]["cost_per_hire"] == 18.75  # (18) + (18 + 1.5)
 
 
 # 10. Declined offer -> replacement offer

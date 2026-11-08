@@ -186,9 +186,11 @@ async def evaluate(app, target):
                                [latest["id"]] if latest else []))
 
     if t >= IDX["Joined"]:
-        cost = app.get("cost_status")
-        steps.append(_step("cost", "Recruitment cost", bool(cost), cost or "Not reconciled yet",
-                           [] if cost else ["Cost Recorded / Invoice Pending / No Recruitment Cost"], blocking=False))
+        hc = app.get("hire_cost")
+        steps.append(_step("cost", "Recruitment cost", bool(hc),
+                           (f"CTC ₹{hc['ctc']} L + consulting ₹{hc['consulting_fee']} L + recruiter ₹{hc['recruiter_fee']} L = ₹{hc['total']} L "
+                            f"(confirmed by {hc['confirmed_by']})") if hc else "Not confirmed",
+                           [] if hc else ["annual CTC (> 0)", "consulting fees (0 allowed)", "recruiter fees (0 allowed)"]))
         j = await db.joinings.find_one({"application_id": app["id"], "status": {"$nin": ["Cancelled", "No Show"]}}, {"_id": 0})
         if j and j.get("status") == "Joined" and j.get("actual_date"):
             steps.append(_step("joining", "Joining", True, f"{j['code']} joined on {j['actual_date']}", records=[j["id"]]))

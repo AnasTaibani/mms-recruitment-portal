@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
 import { MoveDialog, OfferDialog, ScheduleDialog, SelectionDialog } from "@/components/forms";
+import { HireCostDialog } from "@/components/HireCost";
 
 export const HM_ALLOWED = ["Shortlisted", "CV Rejected", "On Hold", "Interview Rejected", "Selected"];
 
@@ -23,7 +24,7 @@ export function AppActions({ app, onDone }) {
   const allowed = useAllowedMoves()(app.status);
   const [move, setMove] = useState(null);
   const [dlg, setDlg] = useState(null);
-  const any = allowed.length || can("interview.manage") || can("selection.decide") || can("offer.manage") || can("cost.manage");
+  const any = allowed.length || can("interview.manage") || can("selection.decide") || can("offer.manage") || can("cost.view");
   if (!any) return null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
@@ -45,12 +46,13 @@ export function AppActions({ app, onDone }) {
           {can("interview.manage") && !app.closed && <DropdownMenuItem onClick={() => setDlg("schedule")} data-testid="app-action-schedule">Schedule interview</DropdownMenuItem>}
           {can("selection.decide") && !app.closed && <DropdownMenuItem onClick={() => setDlg("select")} data-testid="app-action-selection">Record selection decision</DropdownMenuItem>}
           {can("offer.manage") && ["Selected", "Offer Declined", "Offer Revoked"].includes(app.status) && <DropdownMenuItem onClick={() => setDlg("offer")} data-testid="app-action-offer">{app.status === "Selected" ? "Create offer" : "Create re-offer"}</DropdownMenuItem>}
-          {can("cost.manage") && app.status === "Joined" && <DropdownMenuItem onClick={() => setMove({ app, status: "Joined", focus: "cost" })} data-testid="app-action-cost">Recruitment cost reconciliation{app.cost_status ? ` · ${app.cost_status}` : ""}</DropdownMenuItem>}
+          {can("cost.view") && ["Offer Accepted", "Joined"].includes(app.status) && <DropdownMenuItem onClick={() => setDlg("cost")} data-testid="app-action-cost">Recruitment cost{app.hire_cost ? ` · ₹${app.hire_cost.total} L` : " · not confirmed"}</DropdownMenuItem>}
         </DropdownMenuContent>
       </DropdownMenu>
       <MoveDialog move={move} onClose={() => setMove(null)} onDone={onDone} />
       <ScheduleDialog open={dlg === "schedule"} onOpenChange={(o) => !o && setDlg(null)} application={app} onDone={onDone} />
       <SelectionDialog open={dlg === "select"} onOpenChange={(o) => !o && setDlg(null)} app={app} onDone={onDone} />
+      <HireCostDialog app={app} open={dlg === "cost"} onOpenChange={(o) => !o && setDlg(null)} onDone={onDone} />
       <OfferDialog open={dlg === "offer"} onOpenChange={(o) => !o && setDlg(null)} app={app} onDone={onDone} />
     </div>
   );

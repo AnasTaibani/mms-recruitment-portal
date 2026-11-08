@@ -214,20 +214,21 @@ async def compute(user, f):
                 "joined": len(hires_rows), "conversion": pct(len(hires_rows), len(rows)),
                 "avg_cycle": stats([a["_cycle"] for a in hires_rows])["avg"]}
 
-    # Cost per hire = (recruiter fees + recruitment partner / consultancy fees) ÷ candidates joined.
-    # Candidate CTC is never a recruitment cost. Costs and joiners use the same date / department / role / recruiter filters.
+    # Cost per hire (one hire) = candidate annual CTC + consulting fees + recruiter fees, confirmed before joining.
+    # Average cost per hire = sum of those totals ÷ joined candidates with confirmed cost (same filters as the joiners).
     def cost_for(field, key, hire_rows=()):
         if costs is None:
-            return None
-        return round(sum(c.get("amount") or 0 for c in costs if c.get(field) == key), 2)
+            return None, 0
+        done = [a["hire_cost"]["total"] for a in hire_rows if a.get("hire_cost")]
+        return round(sum(done), 2), len(done)
 
     recruiters = []
     hg = group(lambda a: a.get("recruiter_id"), hires)
     for rid, rows in group(lambda a: a.get("recruiter_id"), apps).items():
         p = perf(rows, hg.get(rid, []))
-        total_cost = cost_for("recruiter_id", rid, hg.get(rid, []))
+        total_cost, n_cost = cost_for("recruiter_id", rid, hg.get(rid, []))
         p |= {"recruiter_id": rid, "name": rows[0].get("recruiter") or "Unassigned", "total_cost": total_cost,
-              "cost_per_hire": round(total_cost / p["joined"], 2) if total_cost is not None and p["joined"] else None,
+              "cost_per_hire": round(total_cost / n_cost, 2) if total_cost is not None and n_cost else None,
               "workload": p["in_process"], "open_requisitions": sum(1 for r in open_reqs if r.get("recruiter_id") == rid)}
         recruiters.append(p)
 
@@ -262,24 +263,35 @@ async def compute(user, f):
         if not pid:
             continue
         p = perf(rows, hp.get(pid, []))
-        tc = cost_for("partner_id", pid, hp.get(pid, []))
+        tc, n_cost = cost_for("partner_id", pid, hp.get(pid, []))
         p |= {"partner": rows[0].get("partner"), "total_cost": tc,
-              "cost_per_hire": round(tc / p["joined"], 2) if tc is not None and p["joined"] else None}
+              "cost_per_hire": round(tc / n_cost, 2) if tc is not None and n_cost else None}
         partners.append(p)
 
     cost = None
     if costs is not None:
-        total = round(sum(c.get("amount") or 0 for c in costs), 2)
+        invoiced = round(sum(c.get("amount") or 0 for c in costs), 2)
         cats = defaultdict(float)
         months = defaultdict(float)
         for c in costs:
             cats[c.get("category") or "Uncategorised"] += c.get("amount") or 0
             months[(c.get("invoice_date") or "")[:7]] += c.get("amount") or 0
-        cost = {"total": total, "fees": total, "hires": len(hires),
-                "cost_per_hire": round(total / len(hires), 2) if hires else None,
+        confirmed = [a for a in hires if a.get("hire_cost")]
+        tot = lambda k: round(sum(a["hire_cost"][k] for a in confirmed), 2)
+        total = tot("total")
+        cost = {"formula": "Cost per Hire = Candidate annual CTC + Consulting fees + Recruiter fees; "
+                           "Average = sum of Cost per Hire for joined candidates with confirmed cost ÷ number of those candidates",
+                "total": total, "ctc_total": tot("ctc"), "consulting_total": tot("consulting_fee"), "recruiter_total": tot("recruiter_fee"),
+                "fees": round(tot("consulting_fee") + tot("recruiter_fee"), 2),
+                "hires": len(confirmed), "joined": len(hires), "unconfirmed": len(hires) - len(confirmed),
+                "cost_per_hire": round(total / len(confirmed), 2) if confirmed else None,
+                "hire_costs": [{"application_id": a["id"], "code": a["code"], "candidate": a["candidate_name"], "requisition_code": a.get("requisition_code"),
+                                "role": a["requisition_title"], "department": a.get("department"), "recruiter": a.get("recruiter"), "partner": a.get("partner"),
+                                "joined_on": a["_join"], **({k: a["hire_cost"][k] for k in ("ctc", "consulting_fee", "recruiter_fee", "total", "confirmed_by", "confirmed_at", "updated_by", "updated_at")}
+                                                            if a.get("hire_cost") else {"total": None, "flag": "Cost not confirmed — not counted as a completed hire"})}
+                               for a in hires],
+                "invoiced": invoiced,
                 "amount_pending": sum(1 for c in costs if c.get("amount") is None),
-                "reconciliation": {s: sum(1 for a in hires if a.get("cost_status") == s) for s in ("Cost Recorded", "Invoice Pending", "No Recruitment Cost")}
-                                  | {"Not reconciled": sum(1 for a in hires if not a.get("cost_status"))},
                 "by_category": [{"category": k, "amount": round(v, 2)} for k, v in cats.items()],
                 "by_month": [{"month": k, "amount": round(v, 2)} for k, v in sorted(months.items()) if k],
                 "paid": round(sum(c["amount"] or 0 for c in costs if c.get("payment_status") == "Paid"), 2)}
@@ -372,7 +384,7 @@ def period_key(d, mode):
 async def summary_rows(user, f, mode):
     data = await compute(user, {k: v for k, v in f.items() if k not in ("date_from", "date_to")})
     apps = await list_applications(user, {k: f.get(k) for k in ("requisition_id", "recruiter_id", "department_id", "source_id", "partner_id")})
-    p = defaultdict(lambda: {"Applications": 0, "Offers Released": 0, "Offers Accepted": 0, "Joined": 0, "Rejections": 0, "Interviews": 0, "Cost (L)": 0.0})
+    p = defaultdict(lambda: {"Applications": 0, "Offers Released": 0, "Offers Accepted": 0, "Joined": 0, "Rejections": 0, "Interviews": 0, "Cost (L)": 0.0, "Hires with Confirmed Cost": 0})
     for a in apps:
         p[period_key(a["created_at"][:10], mode)]["Applications"] += 1
         for h in a.get("history", []):
@@ -388,15 +400,18 @@ async def summary_rows(user, f, mode):
             p[period_key(h["joined_on"], mode)]["Joined"] += 1
     for i in await list_interviews(user, {}):
         p[period_key(i.get("date"), mode)]["Interviews"] += 1
-    if can(user, "cost.view"):
-        for c in await list_costs(user, {}):
-            p[period_key(c.get("invoice_date"), mode)]["Cost (L)"] += c.get("amount") or 0
+    if data.get("cost"):
+        for h in data["cost"]["hire_costs"]:
+            if h["joined_on"] and h.get("total") is not None:
+                k = period_key(h["joined_on"], mode)
+                p[k]["Cost (L)"] += h["total"]
+                p[k]["Hires with Confirmed Cost"] += 1
     rows = []
     for k in sorted(x for x in p if x):
         if (f.get("date_from") and k < period_key(f["date_from"], mode)) or (f.get("date_to") and k > period_key(f["date_to"], mode)):
             continue
         v = p[k]
-        v["Cost per Hire (L)"] = round(v["Cost (L)"] / v["Joined"], 2) if v["Joined"] else "N/A"
+        v["Cost per Hire (L)"] = round(v["Cost (L)"] / v["Hires with Confirmed Cost"], 2) if v.get("Hires with Confirmed Cost") else "N/A"
         v["Cost (L)"] = round(v["Cost (L)"], 2)
         rows.append({"Period": k, **v})
     return rows
@@ -429,6 +444,16 @@ def to_file(headers, rows, fmt, name):
 async def export_report(rtype: str, request: Request, user=Depends(get_user)):
     f = dict(request.query_params)
     fmt = "csv" if f.pop("format", "xlsx") == "csv" else "xlsx"
+    if rtype == "cost-per-hire":
+        if not can(user, "cost.view") or not can(user, "reports.export"):
+            raise HTTPException(403, "Not permitted")
+        hs = ((await compute(user, f)).get("cost") or {}).get("hire_costs", [])
+        heads = [("Application", "code"), ("Candidate", "candidate"), ("Requisition", "requisition_code"), ("Role", "role"), ("Department", "department"),
+                 ("Recruiter", "recruiter"), ("Partner", "partner"), ("Actual DOJ", "joined_on"), ("Annual CTC (L)", "ctc"),
+                 ("Consulting Fees (L)", "consulting_fee"), ("Recruiter Fees (L)", "recruiter_fee"), ("Cost per Hire (L)", "total"),
+                 ("Confirmed By", "confirmed_by"), ("Confirmed At", "confirmed_at"), ("Last Updated By", "updated_by"), ("Flag", "flag")]
+        await log_activity(user, "export", "report", rtype, rtype, f"{len(hs)} rows ({fmt})")
+        return to_file([h for h, _ in heads], [[r.get(k) for _, k in heads] for r in hs], fmt, "cost-per-hire")
     if rtype == "age-per-hire":
         if not can(user, "analytics.view") or not can(user, "reports.export"):
             raise HTTPException(403, "Not permitted")

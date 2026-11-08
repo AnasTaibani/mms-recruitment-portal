@@ -133,9 +133,9 @@ async def closure_issues(req, data):
     positions = data.get("positions", req.get("positions")) or 0
     if (req.get("filled_positions") or 0) < positions and not (data.get("closure_reason") or req.get("closure_reason") or "").strip():
         issues.append("Not all positions are filled — a closure reason is required")
-    pending_cost = await db.applications.count_documents({"requisition_id": req["id"], "status": "Joined", "cost_status": {"$in": [None, ""]}})
+    pending_cost = await db.applications.count_documents({"requisition_id": req["id"], "status": "Joined", "hire_cost": {"$in": [None]}})
     if pending_cost:
-        issues.append(f"{pending_cost} joined candidate(s) have no recruitment cost reconciliation status (Cost Recorded / Invoice Pending / No Recruitment Cost)")
+        issues.append(f"{pending_cost} joined candidate(s) have no confirmed recruitment cost (CTC, consulting fees, recruiter fees)")
     return issues
 
 
@@ -610,4 +610,4 @@ async def application_readiness(aid: str, target: str, user=Depends(require("app
     from workflow import readiness
     app = await get_visible("applications", "app", aid, await get_scope(user))
     return await readiness(app, target, user) | {"candidate_name": (await db.candidates.find_one({"id": app["candidate_id"]}, {"name": 1}) or {}).get("name"),
-                                                  "cost_status": app.get("cost_status"), "interview_waiver": app.get("interview_waiver")}
+                                                  "cost_status": app.get("cost_status"), "hire_cost": app.get("hire_cost"), "interview_waiver": app.get("interview_waiver")}

@@ -35,8 +35,9 @@ function Applications({ c, reload }) {
               <p className="font-mono text-[11px] text-zinc-400">{a.code} · {a.requisition_code}</p>
               <Link to={`/requisitions/${a.requisition_id}`} className="text-base font-semibold text-zinc-900 hover:underline">{a.requisition_title}</Link>
               <p className="text-xs text-zinc-500">{a.department || "—"} · Recruiter {a.recruiter || "—"} · {a.days_in_stage} day(s) in stage {a.stuck && <b className="text-amber-700">· stuck</b>}</p>
-              {a.status === "Joined" && <p className="mt-1 text-xs" data-testid={`application-cost-${a.code}`}>Recruitment cost: {a.cost_status
-                ? <b className="text-zinc-700">{a.cost_status}</b> : <b className="text-amber-700">not reconciled</b>}</p>}
+              {["Offer Accepted", "Joined"].includes(a.status) && <p className="mt-1 text-xs" data-testid={`application-cost-${a.code}`}>Cost per hire: {a.hire_cost
+                ? <b className="text-zinc-700">{lakhs(a.hire_cost.total)} (CTC {lakhs(a.hire_cost.ctc)} + consulting {lakhs(a.hire_cost.consulting_fee)} + recruiter {lakhs(a.hire_cost.recruiter_fee)})</b>
+                : <b className="text-amber-700">not confirmed{a.status === "Joined" ? " — not counted as a completed hire" : " — required before joining"}</b>}</p>}
               {a.interview_waiver && <p className="mt-1 text-xs text-amber-800">Interviews waived by {a.interview_waiver.by}: {a.interview_waiver.reason}</p>}
             </div>
             <div className="flex items-center gap-2"><StatusBadge status={a.status} testid={`application-status-${a.code}`} /><AppActions app={a} onDone={reload} /></div>

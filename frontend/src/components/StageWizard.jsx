@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { FormDialog, SelectField } from "@/components/common/FormDialog";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FeedbackDialog, OfferDialog, ScheduleDialog, SelectionDialog } from "@/components/forms";
+import { HireCostPanel } from "@/components/HireCost";
 import { useAuth } from "@/context/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import { toast } from "sonner";
@@ -329,42 +330,9 @@ function OfferStep({ step, app, rd, can, onSaved }) {
   );
 }
 
-/* ---- Recruitment cost reconciliation (does not block joining) ---- */
-function CostStep({ app, can, onSaved }) {
-  const [form, setForm] = useState(false);
-  const [note, setNote] = useState("");
-  if (!can("cost.manage")) return <p className="text-xs text-zinc-500">Cost reconciliation is done by a Recruiter or Super Admin. It does not block joining.</p>;
-  const setStatus = async (s) => {
-    try { await api.post(`/applications/${app.id}/cost-status`, { cost_status: s, note }); toast.success(`Cost reconciliation: ${s}`); setNote(""); await onSaved(false); }
-    catch (e) { toast.error(errMsg(e)); }
-  };
-  const fields = [
-    { name: "category_id", label: "Cost Category", master: "cost_category", required: true },
-    { name: "partner_name", label: "Recruitment Partner / Consultancy", help: "Free text — leave blank for an external recruiter fee", type: "text" },
-    { name: "recruiter_id", label: "External Recruiter", master: "recruiter" },
-    { name: "amount", label: "Fee Amount (₹ L) — leave blank if the invoice is not in yet", type: "number" },
-    { name: "invoice_no", label: "Invoice No." },
-    { name: "invoice_date", label: "Invoice Date", type: "date" },
-    { name: "payment_status", label: "Payment Status", type: "select", options: opts(["Pending", "Partially Paid", "Paid"]), default: "Pending" },
-    { name: "remarks", label: "Remarks", type: "textarea" },
-  ];
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-zinc-500">Recruitment cost never blocks the joining. It must be reconciled before the requisition is financially closed. Candidate CTC is not a recruitment cost.</p>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => setForm(true)} data-testid="wizard-cost-record">Record a cost</Button>
-        <Button size="sm" variant="outline" onClick={() => setStatus("Invoice Pending")} data-testid="wizard-cost-pending">Invoice pending</Button>
-        <Button size="sm" variant="outline" onClick={() => setStatus("No Recruitment Cost")} data-testid="wizard-cost-none">No recruitment cost</Button>
-      </div>
-      <Input className="h-8 text-xs" placeholder="Note (optional) — e.g. employee referral, direct application" value={note} onChange={(e) => setNote(e.target.value)} />
-      <FormDialog open={form} onOpenChange={setForm} title="Record recruitment cost" description={`${app.candidate_name} · ${app.requisition_title || ""}`} fields={fields}
-        testid="wizard-cost-form" submitLabel="Save cost" onSubmit={async (v) => {
-          if (!v.partner_name && !v.recruiter_id) { toast.error("Enter the recruitment partner or select the recruiter"); return; }
-          try { await api.post("/costs", { ...v, candidate_id: app.candidate_id, requisition_id: app.requisition_id }); toast.success("Cost recorded"); setForm(false); await onSaved(false); }
-          catch (e) { toast.error(errMsg(e)); }
-        }} />
-    </div>
-  );
+/* ---- Recruitment cost confirmation (required before Joined) ---- */
+function CostStep({ app, onSaved }) {
+  return <HireCostPanel app={app} compact onSaved={() => onSaved(true)} />;
 }
 
 /* ---- Joining ---- */

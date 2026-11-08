@@ -265,6 +265,9 @@ async def mark_joined(app, user, actual_date):
     from workflow import not_future
     if not actual_date:
         raise HTTPException(400, "Actual date of joining is required")
+    fresh = await db.applications.find_one({"id": app["id"]}, {"_id": 0, "hire_cost": 1})
+    if not (fresh or {}).get("hire_cost"):
+        raise HTTPException(400, "Confirm the recruitment cost (annual CTC, consulting fees and recruiter fees) before marking the candidate Joined")
     not_future(actual_date, "Actual date of joining")
     offer = await db.offers.find_one({"application_id": app["id"], "status": "Accepted"}, {"_id": 0})
     if not offer:
@@ -520,3 +523,93 @@ async def delete_cost(cid: str, user=Depends(require("cost.manage"))):
     await log_activity(user, "cost_delete", "cost", cid, c["code"], f"₹{c.get('amount')} L removed")
     await sync_cost_status(c.get("candidate_id"), c.get("requisition_id"), user)
     return {"ok": True}
+
+
+# ---------- Cost per hire: CTC + consulting fees + recruiter fees, confirmed per application before Joined ----------
+HIRE_COST_FIELDS = (("ctc", "Candidate annual CTC"), ("consulting_fee", "Consulting fees"), ("recruiter_fee", "Recruiter fees"))
+HIRE_COST_STAGES = ("Offer Accepted", "Joined")
+
+
+class HireCostIn(BaseModel):
+    ctc: Optional[float] = None             # annual CTC, ₹ lakhs
+    consulting_fee: Optional[float] = None  # recruitment partner / consultancy fees, ₹ lakhs (0 allowed)
+    recruiter_fee: Optional[float] = None   # recruiter fees, ₹ lakhs (0 allowed)
+    currency: Optional[str] = "INR"
+    ctc_basis: Optional[str] = "annual"
+    reason: Optional[str] = None            # required when changing a confirmed cost
+    total: Optional[float] = None           # ignored — the total is always calculated here
+
+
+def hire_cost_total(hc):
+    return round(hc["ctc"] + hc["consulting_fee"] + hc["recruiter_fee"], 4)
+
+
+def validate_hire_cost(body):
+    vals = {}
+    for k, label in HIRE_COST_FIELDS:
+        v = getattr(body, k)
+        if v is None:  # blank is never read as zero
+            raise HTTPException(400, f"{label} is required (enter 0 if there is none)" if k != "ctc" else f"{label} is required")
+        if v < 0:
+            raise HTTPException(400, f"{label} cannot be negative")
+        if v > MAX_LAKHS:
+            raise HTTPException(400, f"{label} must be entered in ₹ lakhs — e.g. 6 for ₹6,00,000. {v:,.0f} looks like a rupee amount.")
+        vals[k] = round(float(v), 4)
+    if vals["ctc"] <= 0:
+        raise HTTPException(400, "Candidate annual CTC must be greater than zero")
+    if (body.currency or "INR").upper() != "INR":
+        raise HTTPException(400, "All amounts must be in INR (₹ lakhs)")
+    if (body.ctc_basis or "annual").lower() != "annual":
+        raise HTTPException(400, "CTC must be the annual CTC")
+    return vals
+
+
+async def hire_cost_suggestions(app):
+    """Values already on record, offered as a starting point (never saved without the user confirming them)."""
+    offer = await db.offers.find_one({"application_id": app["id"], "status": "Accepted"}, {"_id": 0, "ctc": 1, "code": 1})
+    costs = await db.costs.find({"candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"]}, {"_id": 0}).to_list(100)
+    with_amt = [c for c in costs if c.get("amount") is not None]
+    part = [c for c in with_amt if c.get("partner_id")]
+    rec = [c for c in with_amt if not c.get("partner_id") and c.get("recruiter_id")]
+    return {"ctc": offer.get("ctc") if offer else None, "ctc_source": f"accepted offer {offer['code']}" if offer else None,
+            "consulting_fee": round(sum(c["amount"] for c in part), 4) if part else None,
+            "recruiter_fee": round(sum(c["amount"] for c in rec) , 4) if rec else None,
+            "cost_entries": len(costs)}
+
+
+@router.get("/applications/{aid}/hire-cost")
+async def get_hire_cost(aid: str, user=Depends(require("cost.view"))):
+    app = await get_visible("applications", "app", aid, await get_scope(user))
+    return {"application_id": aid, "hire_cost": app.get("hire_cost"), "history": app.get("hire_cost_history", []),
+            "suggested": await hire_cost_suggestions(app), "can_edit": can(user, "cost.manage"), "status": app["status"]}
+
+
+@router.put("/applications/{aid}/hire-cost")
+async def confirm_hire_cost(aid: str, body: HireCostIn, user=Depends(require("cost.manage"))):
+    """Confirm (or, with a reason, change) the cost of this hire. One record per application, kept on the application."""
+    app = await get_visible("applications", "app", aid, await get_scope(user))
+    if app["status"] not in HIRE_COST_STAGES:
+        raise HTTPException(400, f"Recruitment cost is confirmed once the offer is accepted (current stage: {app['status']})")
+    vals = validate_hire_cost(body)
+    prev = app.get("hire_cost")
+    reason = (body.reason or "").strip()
+    if prev and not reason:
+        raise HTTPException(400, "A reason is required to change confirmed cost details")
+    ts = now_iso()
+    hc = vals | {"total": hire_cost_total(vals), "currency": "INR", "unit": "lakhs", "ctc_basis": "annual",
+                 "confirmed_by": (prev or {}).get("confirmed_by", user["name"]), "confirmed_by_id": (prev or {}).get("confirmed_by_id", user["id"]),
+                 "confirmed_at": (prev or {}).get("confirmed_at", ts), "updated_by": user["name"], "updated_by_id": user["id"], "updated_at": ts,
+                 "version": (prev or {}).get("version", 0) + 1, "candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"]}
+    if prev and all(prev.get(k) == hc[k] for k, _ in HIRE_COST_FIELDS):
+        return {"hire_cost": prev, "history": app.get("hire_cost_history", []), "unchanged": True}
+    entry = {"at": ts, "by": user["name"], "by_id": user["id"], "action": "Updated" if prev else "Confirmed", "reason": reason,
+             "previous": {k: prev.get(k) for k in ("ctc", "consulting_fee", "recruiter_fee", "total")} if prev else None,
+             "new": {k: hc[k] for k in ("ctc", "consulting_fee", "recruiter_fee", "total")}}
+    guard = {"id": aid, "hire_cost.version": prev["version"]} if prev else {"id": aid, "hire_cost": {"$in": [None]}}
+    res = await db.applications.update_one(guard, {"$set": {"hire_cost": hc, "updated_at": ts}, "$push": {"hire_cost_history": entry}})
+    if not res.modified_count:
+        raise HTTPException(409, "The cost details were changed by someone else — reload and try again")
+    fmt = lambda d: f"CTC ₹{d['ctc']} L + consulting ₹{d['consulting_fee']} L + recruiter ₹{d['recruiter_fee']} L = ₹{d['total']} L"
+    await log_activity(user, "hire_cost_update" if prev else "hire_cost_confirm", "application", aid, app.get("code", ""),
+                       (f"{fmt(entry['previous'])} → {fmt(entry['new'])} ({reason})" if prev else fmt(entry["new"])))
+    return {"hire_cost": hc, "history": app.get("hire_cost_history", []) + [entry]}

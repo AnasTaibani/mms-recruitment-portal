@@ -3,7 +3,7 @@ import { Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/lib/useFetch";
-import { Kpi, PageHeader } from "@/components/common/Page";
+import { Kpi, PageHeader, Section } from "@/components/common/Page";
 import { DataTable } from "@/components/common/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FormDialog, SelectField } from "@/components/common/FormDialog";
@@ -32,7 +32,7 @@ export default function Costs() {
     { name: "recruiter_id", label: "Recruiter", master: "recruiter" },
     { name: "partner_name", label: "Recruitment Partner", suggest: "partner", placeholder: "Type the partner / consultancy name" },
     { name: "ctc", label: "Candidate CTC (₹ L)", type: "number", max: 1000, maxMessage: LAKH_MSG, placeholder: "e.g. 35",
-      help: (v) => rupees(v.ctc) || "Only used to work out a %-based fee. Candidate CTC is never counted as a recruitment cost." },
+      help: (v) => rupees(v.ctc) || "Only used here to work out a %-based fee. The hire's CTC for Cost per Hire is confirmed on the candidate before joining." },
     { name: "fee_percent", label: "Fee %", type: "number", max: 100, maxMessage: "Enter a percentage between 0 and 100", placeholder: "e.g. 8.33",
       help: "Partner fee as % of CTC — e.g. 8.33 for M2S, 7 for others" },
     { name: "amount", label: "Fee Amount (₹ L) — leave blank if not yet known", type: "number", max: 1000, maxMessage: LAKH_MSG,
@@ -69,19 +69,29 @@ export default function Costs() {
   const sel = (k, opts, ph) => <SelectField value={f[k]} onChange={(v) => setF({ ...f, [k]: v })} options={opts} placeholder={ph} testid={`cost-filter-${k}`} className="w-40" />;
   return (
     <div>
-      <PageHeader eyebrow="Finance" title="Recruitment Costs" description="Cost per Hire = (recruiter fees + recruitment partner / consultancy fees) ÷ candidates joined. Candidate CTC is not a recruitment cost. Amounts are in ₹ lakhs."
+      <PageHeader eyebrow="Finance" title="Recruitment Costs" description="Cost per Hire = Candidate annual CTC + Consulting fees + Recruiter fees, confirmed for every candidate before joining. Average = sum of Cost per Hire ÷ joined candidates with confirmed cost. Amounts in ₹ lakhs."
         actions={<>
           {can("reports.export") && <Button variant="outline" onClick={() => download("/reports/costs", f)} data-testid="cost-export-btn"><Download className="mr-2 h-4 w-4" />Export</Button>}
           {can("cost.manage") && <Button onClick={() => setEdit({})} data-testid="cost-new-btn"><Plus className="mr-2 h-4 w-4" />Add cost</Button>}
         </>} />
       <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Recruitment fees" value={an?.cost ? lakhs(an.cost.total) : "—"} hint={`Recruiter + partner / consultancy · paid ${lakhs((data || []).filter((c) => c.payment_status === "Paid").reduce((s, c) => s + (c.amount || 0), 0))}`} testid="cost-fees" />
-        <Kpi label="Candidates joined" value={an?.cost?.hires ?? "—"} hint="Denominator (actual joiners, same filters)" />
-        <Kpi label="Cost per hire" value={an?.cost ? (an.cost.cost_per_hire === null ? "N/A" : lakhs(an.cost.cost_per_hire)) : "—"} hint="Fees ÷ joined" testid="cost-per-hire" />
-        <Kpi label="Invoices pending" value={an?.cost ? an.cost.amount_pending : "—"} hint="Cost entries without an amount yet" testid="cost-amount-pending" />
-        <Kpi label="Hires not reconciled" value={an?.cost?.reconciliation ? an.cost.reconciliation["Not reconciled"] : "—"}
-          hint={an?.cost?.reconciliation ? `${an.cost.reconciliation["Cost Recorded"]} recorded · ${an.cost.reconciliation["Invoice Pending"]} invoice pending · ${an.cost.reconciliation["No Recruitment Cost"]} no cost` : ""} testid="cost-unreconciled" />
+        <Kpi label="Average cost per hire" value={an?.cost ? (an.cost.cost_per_hire === null ? "N/A" : lakhs(an.cost.cost_per_hire)) : "—"} hint="Sum of Cost per Hire ÷ hires with confirmed cost" testid="cost-per-hire" />
+        <Kpi label="Total hiring cost" value={an?.cost ? lakhs(an.cost.total) : "—"} hint="CTC + consulting + recruiter fees" testid="cost-total" />
+        <Kpi label="Candidate CTC" value={an?.cost ? lakhs(an.cost.ctc_total) : "—"} hint="Annual CTC of joined hires" testid="cost-ctc-total" />
+        <Kpi label="Consulting + recruiter fees" value={an?.cost ? lakhs(an.cost.fees) : "—"} hint={an?.cost ? `Consulting ${lakhs(an.cost.consulting_total)} · recruiter ${lakhs(an.cost.recruiter_total)}` : ""} testid="cost-fees" />
+        <Kpi label="Hires counted" value={an?.cost ? `${an.cost.hires} / ${an.cost.joined}` : "—"} hint="Joined with confirmed cost / all joined" testid="cost-hires" />
       </div>
+      {an?.cost?.unconfirmed > 0 && <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" data-testid="cost-unconfirmed">{an.cost.unconfirmed} joined candidate(s) have no confirmed cost (usually records from before this rule) and are not counted as completed hires in the average. Confirm their cost from the candidate's application menu.</p>}
+      <Section title="Cost per hire by candidate" className="mb-4" testid="cost-per-hire-section"
+        actions={can("reports.export") && <Button size="sm" variant="outline" onClick={() => download("/reports/cost-per-hire", f)} data-testid="cost-per-hire-export"><Download className="mr-2 h-4 w-4" />Export</Button>}>
+        <DataTable testid="cost-per-hire-table" data={an?.cost?.hire_costs || []} loading={!an} pageSize={8} emptyTitle="No joined candidates in this period"
+          columns={[{ key: "candidate", label: "Candidate" }, { key: "role", label: "Role" }, { key: "joined_on", label: "Joined", render: (r) => fmtDate(r.joined_on) },
+            { key: "ctc", label: "Annual CTC", render: (r) => lakhs(r.ctc) }, { key: "consulting_fee", label: "Consulting", render: (r) => lakhs(r.consulting_fee) },
+            { key: "recruiter_fee", label: "Recruiter", render: (r) => lakhs(r.recruiter_fee) },
+            { key: "total", label: "Cost per hire", render: (r) => (r.total == null ? <span className="text-xs font-semibold text-amber-700">Not confirmed</span> : <b>{lakhs(r.total)}</b>) },
+            { key: "confirmed_by", label: "Confirmed by", hidden: true }]} />
+      </Section>
+      <p className="eyebrow mb-2">Invoices &amp; fee entries</p>
       <DataTable testid="cost-table" columns={cols} data={data} loading={loading}
         toolbar={<>
           {sel("category_id", m("cost_category"), "All categories")}

@@ -10,7 +10,7 @@ import { toast } from "sonner";
 const REPORTS = [
   ["candidates", "Candidate list", "cand.view"], ["requisitions", "Requisition-wise report", "req.view"], ["pipeline", "Application pipeline", "app.view"],
   ["interviews", "Interview schedule", "interview.view"], ["offers", "Offer report", "offer.view"], ["joinings", "Joining report", "joining.view"],
-  ["costs", "Recruitment cost report", "cost.view"], ["recruiters", "Recruiter-wise report", "analytics.view"], ["sources", "Source-wise report", "analytics.view"],
+  ["costs", "Recruitment cost report (invoices)", "cost.view"], ["cost-per-hire", "Cost per hire report", "cost.view"], ["recruiters", "Recruiter-wise report", "analytics.view"], ["sources", "Source-wise report", "analytics.view"],
   ["funnel", "Funnel report", "analytics.view"], ["age-per-hire", "Age per Hire report", "analytics.view"], ["summary?period=monthly", "Monthly recruitment summary", "analytics.view"], ["summary?period=quarterly", "Quarterly recruitment summary", "analytics.view"],
 ];
 

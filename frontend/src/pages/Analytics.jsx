@@ -103,11 +103,11 @@ export default function Analytics() {
         </TabsContent>
         {d.cost && <TabsContent value="cost" className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
-            <Kpi label="Recruitment fees" value={lakhs(d.cost.total)} hint="Recruiter + partner / consultancy fees (CTC excluded)" testid="an-cost-total" /><Kpi label="Candidates joined" value={d.cost.hires} hint="Denominator — actual joiners only" />
-            <Kpi label="Cost per hire" value={d.cost.cost_per_hire === null ? "N/A" : lakhs(d.cost.cost_per_hire)} testid="an-cost-per-hire" /><Kpi label="Paid" value={lakhs(d.cost.paid)} />
+            <Kpi label="Total hiring cost" value={lakhs(d.cost.total)} hint={`CTC ${lakhs(d.cost.ctc_total)} + fees ${lakhs(d.cost.fees)} · ${d.cost.hires} of ${d.cost.joined} hires confirmed`} testid="an-cost-total" /><Kpi label="Hires counted" value={`${d.cost.hires} / ${d.cost.joined}`} hint="Joined with confirmed cost / all joined" />
+            <Kpi label="Average cost per hire" value={d.cost.cost_per_hire === null ? "N/A" : lakhs(d.cost.cost_per_hire)} hint="CTC + consulting + recruiter fees, averaged" testid="an-cost-per-hire" /><Kpi label="Invoices paid" value={lakhs(d.cost.paid)} />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <Section title="Cost by category"><Bars data={d.cost.by_category} x="category" bars={[["amount", "₹ L"]]} /></Section>
+            <Section title="Invoiced fees by category"><Bars data={d.cost.by_category} x="category" bars={[["amount", "₹ L"]]} /></Section>
             <Section title="Cost by month"><Bars data={d.cost.by_month} x="month" bars={[["amount", "₹ L"]]} /></Section>
           </div>
         </TabsContent>}

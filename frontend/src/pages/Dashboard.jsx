@@ -22,7 +22,7 @@ export function KpiGrid({ k, cost, cycle, aph }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {items.map(([l, v]) => <Kpi key={l} label={l} value={v} testid={`kpi-${l.toLowerCase().replace(/ /g, "-")}`} />)}
-      {cost !== undefined && <Kpi label="Cost per Hire" value={cost ? (cost.cost_per_hire === null ? "N/A" : lakhs(cost.cost_per_hire)) : "—"} hint="(recruiter + partner fees) ÷ joined" testid="kpi-cost-per-hire" />}
+      {cost !== undefined && <Kpi label="Cost per Hire" value={cost ? (cost.cost_per_hire === null ? "N/A" : lakhs(cost.cost_per_hire)) : "—"} hint="Avg of CTC + consulting + recruiter fees" testid="kpi-cost-per-hire" />}
       {aph && <Kpi label="Age per Hire" value={num(aph.completed.avg, " d")} hint={`Median ${num(aph.completed.median, " d")} · DOJ − CRF`} testid="kpi-aph-avg" />}
       {cycle && <Kpi label="Avg Cycle Time" value={num(cycle.completed.avg, " d")} hint={`From earlier of CRF / initiation · median ${num(cycle.completed.median, " d")}`} testid="kpi-cycle-time" />}
     </div>

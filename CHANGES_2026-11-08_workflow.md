@@ -1,5 +1,7 @@
 # MMS Recruitment Portal — Workflow correction (08-11-2026)
 
+> **Note:** the cost rules below (fees-only Cost per Hire, cost not blocking joining) were replaced the same day — see `CHANGES_2026-11-08_cost_per_hire.md`.
+
 Applies the "Workflow Audit & Correction" brief. No redesign, no data deleted, no accounts changed.
 
 ## 1. Modified / new files

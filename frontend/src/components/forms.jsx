@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -141,6 +141,8 @@ export function FeedbackDialog({ open, onOpenChange, interview, onDone }) {
   const [rec, setRec] = useState(null);
   const [text, setText] = useState({ detailed: "", strengths: "", improvements: "" });
   const [ivr, setIvr] = useState(null);
+  // a recruiter who is on the panel gives their own feedback by default (they can still enter it on behalf of another panellist)
+  useEffect(() => { if (open) setIvr(interview?.my_pending?.[0] || null); }, [open, interview?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false);
   const admin = ["super_admin", "recruiter"].includes(user.role);
   const ready = RATINGS.every(([k]) => r[k]) && rec && text.detailed.trim() && (!admin || ivr || interview?.my_pending?.length);

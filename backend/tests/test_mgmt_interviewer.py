@@ -145,17 +145,32 @@ def test_07_other_roles_unchanged(admin):
     assert ok(admin.get(f"{API}/interviews/{S['iv_mine']}"))["status"] == "Completed"
     rec = sess(S["email_rec"])
     me = ok(rec.get(f"{API}/auth/me"))
-    assert me["roles"] == ["recruiter"] and {"req.manage", "app.move", "cost.manage", "interview.manage"} <= set(me["permissions"])
+    assert me["roles"] == ["recruiter", "interviewer"] and {"req.manage", "app.move", "cost.manage", "interview.manage", "feedback.submit"} <= set(me["permissions"])
     assert len(ok(rec.get(f"{API}/interviews", params={"requisition_id": S["req"]}))) == 2
     ok(rec.put(f"{API}/requisitions/{S['req']}", json={"remarks": "still editable by Recruiter"}))
 
 
 def test_08_role_change_hides_interviewer_record(admin):
     uid = S["user_mg2"]["id"]
-    ok(admin.put(f"{API}/users/{uid}", json={"role": "recruiter"}))
+    ok(admin.put(f"{API}/users/{uid}", json={"role": "super_admin"}))  # Super Admin carries no interviewer record
     ms = ok(admin.get(f"{API}/masters"))
     m = next(x for x in ms if x["type"] == "interviewer" and x.get("user_id") == uid)
     assert m["active"] is False
     ok(admin.put(f"{API}/users/{uid}", json={"role": "management"}))
     m = next(x for x in ok(admin.get(f"{API}/masters")) if x["type"] == "interviewer" and x.get("user_id") == uid)
     assert m["active"] is True
+
+
+def test_09_recruiters_interview(admin):
+    """Every recruiter is selectable as an interviewer and gives feedback as themselves."""
+    rec = S["user_rec"]
+    m = next((x for x in ok(admin.get(f"{API}/masters")) if x["type"] == "interviewer" and x.get("user_id") == rec["id"]), None)
+    assert m and m["active"]
+    iv = ok(admin.post(f"{API}/interviews", json={"application_id": S["app_two"], "round_name": "Recruiter panel", "date": D(1), "start_time": "15:00",
+                                                  "end_time": "15:30", "interviewer_ids": [m["id"]], "force": True}))
+    rs = sess(S["email_rec"])
+    assert ok(rs.get(f"{API}/interviews/{iv['id']}"))["my_pending"] == [m["id"]]
+    assert iv["id"] in [i["id"] for i in ok(rs.get(f"{API}/interviews", params={"mine": "true"}))]
+    ok(rs.post(f"{API}/interviews/{iv['id']}/feedback", json={"ratings": {k: 4 for k in ["technical", "communication", "problem_solving", "relevant_experience", "role_fit", "overall"]},
+                                                              "recommendation": "Hire", "detailed": "Recruiter panel feedback"}))
+    assert ok(admin.get(f"{API}/interviews/{iv['id']}"))["status"] == "Completed"

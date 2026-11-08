@@ -31,9 +31,10 @@ ROLES = {"super_admin": "Super Admin", "recruiter": "Recruiter", "management": "
 LEGACY_ROLES = {"hr_admin": "recruiter", "hiring_manager": "management"}
 ROLE_PERSON = {"recruiter": "recruiter", "interviewer": "interviewer"}
 # Additive roles: a role can carry another role's capabilities (permissions + person record) on top of its own.
-# Management members also interview: they get the Interviewer permissions and appear in the interviewer list,
-# but nothing else from it — and see only the interviews they are assigned to (unless the Super Admin allows more).
-ROLE_IMPLIES = {"management": ["interviewer"]}
+# Management members and Recruiters also interview: they appear in the interviewer list and can give feedback on the
+# interviews they are on. Management gets nothing else from it and sees only its own interviews (unless the Super
+# Admin allows more); Recruiters already hold every interviewer permission, so only the interviewer record is added.
+ROLE_IMPLIES = {"management": ["interviewer"], "recruiter": ["interviewer"]}
 
 ALL_PERMS = {"users.manage", "users.super", "masters.manage", "settings.manage", "req.view", "req.manage",
              "cand.view", "cand.manage", "app.view", "app.create", "app.move", "app.decide", "interview.view",

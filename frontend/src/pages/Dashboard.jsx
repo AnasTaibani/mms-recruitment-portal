@@ -468,7 +468,7 @@ function DistributionTile({ items, total }) {
 
 export default function Dashboard() {
   const { user, can } = useAuth();
-  const dual = can("analytics.view") && user.role === "management" && (user.roles || []).includes("interviewer");
+  const dual = can("analytics.view") && user.role !== "super_admin" && (user.roles || []).includes("interviewer");
   const [view, setView] = useState("overview");
   const [f, setF] = useState({ period: "30d" });
   const [gran, setGran] = useState(null);

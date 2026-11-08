@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { AssistantLauncher } from "@/components/assistant/AssistantDrawer";
 import { useAuth } from "@/context/AuthContext";
 import { api, fmtDateTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -170,7 +171,9 @@ export default function AppShell() {
             </DropdownMenu>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-7"><Outlet /></main>
+        <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pt-7"><Outlet /></main>
+        {/* keyed by user: a different sign-in starts with an empty assistant; signing out unmounts it */}
+        <AssistantLauncher key={user.id} />
       </div>
     </div>
   );

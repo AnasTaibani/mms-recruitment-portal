@@ -23,6 +23,7 @@ import routes_offers
 import routes_analytics
 import routes_import
 import routes_dashboard
+import routes_ai_assistant
 
 logger = logging.getLogger("mms")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -182,7 +183,7 @@ async def alert_loop():
 
 
 app = FastAPI(title="MMS Recruitment Portal")
-for r in (routes_admin, routes_recruit, routes_interviews, routes_offers, routes_analytics, routes_import, routes_dashboard):
+for r in (routes_admin, routes_recruit, routes_interviews, routes_offers, routes_analytics, routes_import, routes_dashboard, routes_ai_assistant):
     app.include_router(r.router)
 
 

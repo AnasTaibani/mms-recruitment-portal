@@ -36,3 +36,15 @@ Files: `backend/routes_dashboard.py` (new), `backend/server.py`, `backend/routes
 - `test_dashboard.py`, 5 passed: figures match the records; there are no invented comparisons; it is consistent with `/api/analytics` (cost, age per hire, sources, recruiters); period arithmetic and validation work; roles behave as expected (Interviewer 403, Management sees the org view and only their own interviews, Recruiter full).
 - Earlier suites still pass, 44 tests in total.
 - Browser at 1440 / 820 / 390 px: no horizontal overflow and no JS errors. Period, granularity and custom range all update the figures, the tooltip shows dated values, and funnel, source and pending clicks open filtered lists.
+
+---
+
+## Update — 10 Nov 2026: people vs applications
+
+Why: "Total candidates" (people with an application) didn't match the Candidates page (all candidates), and the funnel counts applications, so the three numbers looked contradictory.
+
+- **Total candidates** — with no department/requisition/recruiter filter, now counts the candidate master (same as the Candidates page). Below it: "N linked" (candidates attached to at least one requisition). With a filter applied it counts people with applications in that filter. "New in period" uses the candidate's created date when unfiltered.
+- **Recruitment funnel** — subtitle "M applications from N candidates"; footer explains it counts applications.
+- **Hires** — when someone has joined on more than one requisition in the period, shows "X joinings · Y people". Hidden otherwise.
+- Files: `backend/routes_dashboard.py`, `frontend/src/pages/Dashboard.jsx`, `backend/tests/test_dashboard.py` (1 new test). No calculation used elsewhere was changed.
+- Tests: dashboard 6/6 passed; workflow, cost per hire, management-interviewer suites unchanged (46 passed in total). The "joinings · people" line was checked for the no-duplicate case only; the duplicate case wasn't set up in tests.

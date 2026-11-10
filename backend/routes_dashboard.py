@@ -11,7 +11,7 @@ from statistics import median
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from core import db, require, can, get_scope, today, days_between, INACTIVE, PIPELINE
-from routes_recruit import list_applications, list_requisitions
+from routes_recruit import list_applications, list_requisitions, list_candidates
 from routes_interviews import list_interviews
 from routes_analytics import compute, stage_idx, pct
 
@@ -105,8 +105,14 @@ async def dashboard(request: Request, user=Depends(require("analytics.view"))):
     if f.get("requisition_id"):
         reqs = [r for r in reqs if r["id"] == f["requisition_id"]]
 
+    # Candidate master (same list as the Candidates page). Only used when no requisition/department/recruiter filter is
+    # applied — a candidate not linked to any requisition can't belong to one of those filters.
+    master = None if scope_f else await list_candidates(user, {})
+
     # ---------- events ----------
     def events(kind):
+        if kind == "added" and master is not None:
+            return [c["created_at"][:10] for c in master if c.get("created_at")]
         if kind == "added":
             first = {}
             for a in apps:
@@ -141,19 +147,31 @@ async def dashboard(request: Request, user=Depends(require("analytics.view"))):
         prev = sum(1 for x in ev if within(x, pstart, pend))
         return cur, prev, len(ev)
 
-    def kpi(key, label, value, kind, note, link, flow_is_value=False):
+    def kpi(key, label, value, kind, note, link, flow_is_value=False, detail=None):
         cur, prev, total = flow(kind)
         return {"key": key, "label": label, "value": cur if flow_is_value else value, "period_count": cur, "previous_count": prev,
-                "change_pct": change(cur, prev), "all_time": total, "note": note, "link": link, "flow": flow_is_value}
+                "change_pct": change(cur, prev), "all_time": total, "note": note, "link": link, "flow": flow_is_value, "detail": detail}
+
+    # people vs applications, so tiles reconcile with the Candidates page and the funnel
+    linked = len({a["candidate_id"] for a in apps})
+    if master is not None:
+        cand_value = len(master)
+        cand_detail = f"{linked} linked"
+    else:
+        cand_value = linked
+        cand_detail = None
+    joined_now = [a for a in apps if a["_join"] and within(a["_join"])]
+    joined_people = len({a["candidate_id"] for a in joined_now})
+    hires_detail = f"{len(joined_now)} joinings · {joined_people} {'person' if joined_people == 1 else 'people'}" if joined_people != len(joined_now) else None
 
     by_status = defaultdict(int)
     for a in apps:
         by_status[a["status"]] += 1
     open_reqs = [r for r in reqs if r.get("status") == "Open"]
     hero = [
-        kpi("candidates", "Total candidates", len({a["candidate_id"] for a in apps}), "added", "new in period", "/candidates"),
+        kpi("candidates", "Total candidates", cand_value, "added", "new in period", "/candidates", detail=cand_detail),
         kpi("open_requisitions", "Open requisitions", len(open_reqs), "reqs_opened", "raised in period", "/requisitions?status=Open"),
-        kpi("hires", "Hires", by_status["Joined"], "joined", "joined in period", "/pipeline?status=Joined", flow_is_value=True),
+        kpi("hires", "Hires", by_status["Joined"], "joined", "joined in period", "/pipeline?status=Joined", flow_is_value=True, detail=hires_detail),
         kpi("screening", "In screening", by_status["Screening"], "screening", "entered in period", "/pipeline?status=Screening"),
         kpi("interview", "In interview", sum(by_status[s] for s in INTERVIEW_STAGES), "interview", "entered in period", "/pipeline?status=" + ",".join(INTERVIEW_STAGES)),
     ]
@@ -300,7 +318,7 @@ async def dashboard(request: Request, user=Depends(require("analytics.view"))):
     return {"period": {"key": period, "start": start.isoformat(), "end": end.isoformat(), "previous_start": pstart.isoformat(),
                        "previous_end": pend.isoformat(), "granularity": gran},
             "hero": hero, "trend": {"series": [{"key": k, "label": l} for k, l in series_kinds], "points": trend},
-            "funnel": {"stages": funnel, "overall_conversion": overall, "cohort": len(cohort)},
+            "funnel": {"stages": funnel, "overall_conversion": overall, "cohort": len(cohort), "cohort_candidates": len({a["candidate_id"] for a in cohort})},
             "cost": cost, "age_per_hire": age, "sources": sources, "recruiters": recruiters, "requisitions": requisitions,
             "upcoming_interviews": upcoming, "activity": feed, "pending": pending, "distribution": distribution,
             "total_applications": len(apps)}

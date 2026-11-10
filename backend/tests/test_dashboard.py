@@ -107,3 +107,26 @@ def test_04_roles(admin):
     assert mg["upcoming_interviews"] == []  # only interviews they are assigned to
     rec = ok(sess(S["email_rec"]).get(f"{API}/dashboard", params={"period": "30d", "department_id": S["dept"]}))
     assert hero(rec, "candidates")["value"] == 3
+
+
+# ---------- people vs applications (10 Nov) ----------
+def test_people_vs_applications_reconcile(admin):
+    # a candidate with no requisition, and one candidate applied to two requisitions
+    ok(admin.post(f"{API}/candidates", json={"name": f"TEST_Dash Unlinked {TAG}", "email": f"dash_unl_{TAG}@mms.test", "force": True}))
+    req2 = ok(admin.post(f"{API}/requisitions", json={"title": f"TEST_Dash Role2 {TAG}", "positions": 1, "crf_date": D(10), "status": "Open", "department_id": S["dept"]}))["id"]
+    cand0 = next(a["candidate_id"] for a in ok(admin.get(f"{API}/applications", params={"requisition_id": S["req"]})))
+    ok(admin.post(f"{API}/applications", json={"candidate_id": cand0, "requisition_id": req2}))
+
+    # unfiltered: tile = candidate master (same as the Candidates page)
+    d = ok(admin.get(f"{API}/dashboard", params={"period": "year"}))
+    cands, apps = ok(admin.get(f"{API}/candidates")), ok(admin.get(f"{API}/applications"))
+    h = hero(d, "candidates")
+    assert h["value"] == len(cands)
+    assert h["detail"] == f"{len({a['candidate_id'] for a in apps})} linked"
+
+    # filtered to the department: people with applications there, plus the application count when they differ
+    d = ok(admin.get(f"{API}/dashboard", params={"period": "year", "department_id": S["dept"]}))
+    h = hero(d, "candidates")
+    assert h["value"] == 3 and h["detail"] is None
+    assert d["funnel"]["cohort"] == 4 and d["funnel"]["cohort_candidates"] == 3
+    assert hero(d, "hires")["detail"] is None  # nobody joined twice

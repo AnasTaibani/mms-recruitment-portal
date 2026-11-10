@@ -93,6 +93,8 @@ function KpiRow({ d }) {
               <span className="mt-1 block truncate text-[12px] text-subtle" title={h.flow ? `${h.previous_count} in the previous period` : `${h.period_count} ${h.note}`}>
                 {h.flow ? `${h.note.replace(" in period", "")} · prev. ${h.previous_count}` : `${h.period_count} ${h.note}`}
               </span>
+              {h.detail && <span className="mt-0.5 block text-[12px] font-medium leading-snug text-brand-deep" data-testid={`hero-${h.key}-detail`}
+                title={h.key === "candidates" ? "Candidates attached to at least one requisition" : "One person joined on more than one requisition"}>{h.detail}</span>}
             </span>
           </Link>
         );
@@ -152,7 +154,7 @@ function FunnelTile({ d }) {
   const st = d.funnel.stages;
   const n = st.length;
   return (
-    <Tile title="Recruitment funnel" info="Applications created in the period; each stage counts applications that reached it" className="lg:col-span-5" testid="dashboard-funnel"
+    <Tile title={<span className="flex flex-col">Recruitment funnel{d.funnel.cohort ? <span className="text-[13px] font-normal text-subtle" data-testid="funnel-cohort">{d.funnel.cohort} application{d.funnel.cohort === 1 ? "" : "s"} from {d.funnel.cohort_candidates} candidate{d.funnel.cohort_candidates === 1 ? "" : "s"}</span> : null}</span>} info="Applications created in the period; each stage counts applications that reached it" className="lg:col-span-5" testid="dashboard-funnel"
       action={<span className="rounded-full bg-brand-pale px-3 py-1 text-[13px] font-semibold text-brand-deep" data-testid="funnel-overall">Overall conversion: {d.funnel.overall_conversion == null ? "—" : `${d.funnel.overall_conversion}%`}</span>}>
       {!d.funnel.cohort ? <Unavailable className="min-h-[260px]">No applications created in this period</Unavailable> : (
         <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-x-4">
@@ -187,7 +189,7 @@ function FunnelTile({ d }) {
           </table>
         </div>
       )}
-      <p className="mt-3 text-[12px] text-subtle">Conversion to the next stage · {d.funnel.cohort} application(s) created in the period · click a stage to open it</p>
+      <p className="mt-3 text-[12px] text-subtle">Counts applications (one candidate can apply to several requisitions) · conversion to the next stage · click a stage to open it</p>
     </Tile>
   );
 }

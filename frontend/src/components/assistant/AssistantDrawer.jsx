@@ -1,27 +1,54 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowUp, ExternalLink, Loader2, MessageSquarePlus, Sparkles, X } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { api, errMsg, fmtDateTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { MathFormula, splitFormulas } from "./MathFormula";
 
 const MAX_CHARS = 1000;
 const STARTERS = ["Give me an update on BA requirements.", "Show the current recruitment pipeline.", "What is the interview status?", "Summarise the latest offers."];
 
-/* Minimal, safe rendering of the assistant's text: paragraphs, "- " bullets and **bold** (no HTML is ever injected). */
+/* Minimal, safe rendering of the assistant's text: paragraphs, "- " bullets, **bold** and $$ equations (no HTML is ever injected). */
 function RichText({ text }) {
   const inline = (s, k) => s.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith("**") && p.endsWith("**") ? <b key={`${k}-${i}`} className="font-semibold">{p.slice(2, -2)}</b> : <Fragment key={`${k}-${i}`}>{p}</Fragment>));
   const out = [];
   let list = [];
   const flush = (k) => { if (list.length) { out.push(<ul key={`ul-${k}`} className="my-1.5 list-disc space-y-1 pl-5">{list}</ul>); list = []; } };
-  text.split("\n").forEach((line, i) => {
-    const t = line.trim();
-    if (/^[-•*]\s+/.test(t)) list.push(<li key={i}>{inline(t.replace(/^[-•*]\s+/, ""), i)}</li>);
-    else { flush(i); if (t) out.push(<p key={i} className="my-1.5 first:mt-0">{inline(t.replace(/^#+\s*/, ""), i)}</p>); }
+  splitFormulas(text).forEach((part, pi) => {
+    if (part.formula) { flush(`f${pi}`); out.push(<MathFormula key={`f${pi}`} tex={part.v} />); return; }
+    part.v.split("\n").forEach((line, li) => {
+      const t = line.trim(), i = `${pi}-${li}`;
+      if (/^[-•*]\s+/.test(t)) list.push(<li key={i}>{inline(t.replace(/^[-•*]\s+/, ""), i)}</li>);
+      else { flush(i); if (t) out.push(<p key={i} className="my-1.5 first:mt-0">{inline(t.replace(/^#+\s*/, ""), i)}</p>); }
+    });
   });
   flush("end");
   return <div className="text-[14px] leading-relaxed text-ink">{out}</div>;
+}
+
+/* Reveals an answer word by word (equations appear whole). Shows everything at once for reduced-motion users. */
+function useTypewriter(text, animate, onTick) {
+  const units = useMemo(() => splitFormulas(text).flatMap((p) => (p.formula ? [`$$${p.v}$$`] : p.v.split(/(\s+)/).filter(Boolean))), [text]);
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const [n, setN] = useState(animate && !reduce ? 0 : units.length);
+  useEffect(() => {
+    if (n >= units.length) return undefined;
+    const words = units.filter((u) => u.trim()).length || 1;
+    const perTick = Math.max(1, Math.ceil(words / 160));  // ~28 ms per word, long answers finish within ~4.5 s
+    const id = setTimeout(() => {
+      let k = n, added = 0;
+      while (k < units.length && added < perTick) { if (units[k].trim()) added += 1; k += 1; }
+      while (k < units.length && !units[k].trim()) k += 1;
+      setN(k);
+      onTick?.();
+    }, 28);
+    return () => clearTimeout(id);
+  }, [n, units, onTick]);
+  let shown = units.slice(0, n).join("");
+  if ((shown.match(/\*\*/g) || []).length % 2) shown = shown.replace(/\*\*(?!.*\*\*)/, "");  // hide a half-typed **bold** marker
+  return [shown, n >= units.length];
 }
 
 function Block({ b }) {
@@ -56,7 +83,8 @@ function Block({ b }) {
   );
 }
 
-function AssistantMessage({ m, onAsk, busy }) {
+function AssistantMessage({ m, onAsk, busy, onTick }) {
+  const [shown, done] = useTypewriter(m.content || "", Boolean(m.animate), onTick);
   if (m.error) {
     return (
       <div className="flex items-start gap-2 rounded-[12px] border border-[#F1D2D0] bg-[#FBEDEC] px-3 py-2.5 text-[13.5px] text-[#9E3B37]" data-testid="assistant-error">
@@ -67,7 +95,9 @@ function AssistantMessage({ m, onAsk, busy }) {
   return (
     <div className="space-y-2" data-testid="assistant-message">
       <div className="rounded-[14px] rounded-tl-[6px] border border-line bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(32,36,43,0.04)]">
-        <RichText text={m.content} />
+        <RichText text={shown} />
+        {!done && <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-brand-royal align-baseline" aria-hidden />}
+        {done && (<div className="duration-300 animate-in fade-in-0" data-testid="assistant-extras">
         {m.observations?.length > 0 && (
           <div className="mt-2 rounded-[10px] bg-brand-mist px-3 py-2">
             <p className="text-[12px] font-medium text-brand-deep">Key observations</p>
@@ -84,8 +114,9 @@ function AssistantMessage({ m, onAsk, busy }) {
           </div>
         )}
         {m.retrieved_at && <p className="mt-2 text-[11px] text-subtle">From portal data · {fmtDateTime(m.retrieved_at)}</p>}
+        </div>)}
       </div>
-      {m.follow_ups?.length > 0 && (
+      {done && m.follow_ups?.length > 0 && (
         <div className="flex flex-wrap gap-1.5" data-testid="assistant-followups">
           {m.follow_ups.map((f) => (
             <button key={f} type="button" disabled={busy} onClick={() => onAsk(f)}
@@ -117,6 +148,11 @@ export function AssistantDrawer({ open, onOpenChange }) {
     setTimeout(() => inputRef.current?.focus(), 150);
   }, [open, reset]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, busy]);
+  // keep the typing answer in view, unless the user has scrolled up to read something earlier
+  const followTyping = useCallback(() => {
+    const box = endRef.current?.parentElement;
+    if (box && box.scrollHeight - box.scrollTop - box.clientHeight < 120) box.scrollTop = box.scrollHeight;
+  }, []);
 
   const ask = async (text) => {
     const q = (text ?? draft).trim();
@@ -130,7 +166,7 @@ export function AssistantDrawer({ open, onOpenChange }) {
     try {
       const { data } = await api.post("/ai-assistant/chat", { question: q, conversation_context: history, context });
       if (mine !== reqId.current) return;  // chat was reset while waiting
-      setMessages((ms) => [...ms, { role: "assistant", content: data.answer, observations: data.observations, blocks: data.blocks,
+      setMessages((ms) => [...ms, { role: "assistant", animate: true, content: data.answer, observations: data.observations, blocks: data.blocks,
         follow_ups: data.follow_up_suggestions, links: data.related_links, retrieved_at: data.retrieved_at }]);
       if (data.context !== undefined) setContext(data.context);
     } catch (e) {
@@ -182,7 +218,7 @@ export function AssistantDrawer({ open, onOpenChange }) {
             <div key={i} className="flex justify-end" data-testid="user-message">
               <p className="max-w-[85%] whitespace-pre-wrap rounded-[14px] rounded-tr-[6px] bg-brand-deep px-3.5 py-2 text-[14px] text-white">{m.content}</p>
             </div>
-          ) : <AssistantMessage key={i} m={m} onAsk={ask} busy={busy} />))}
+          ) : <AssistantMessage key={i} m={m} onAsk={ask} busy={busy} onTick={followTyping} />))}
           {busy && (
             <div className="flex items-center gap-2 text-[13px] text-subtle" data-testid="assistant-loading">
               <Loader2 className="h-4 w-4 animate-spin text-brand-royal" />Checking portal data and preparing an answer…

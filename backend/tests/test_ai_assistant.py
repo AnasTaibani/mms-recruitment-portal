@@ -334,3 +334,30 @@ def test_26_missing_key_is_a_controlled_error():
     r = ask(s, "Give me an update on BA requirements", base=base)
     assert r.status_code == 503 and r.json()["code"] == "not_configured"
     assert log_pos() == pos  # no fallback provider was called
+
+
+# ---------- formulas & optional observations (10 Nov change) ----------
+COST_FORMULA = r"\text{Cost per Hire} = \text{Candidate Annual CTC} + \text{Consulting Fees} + \text{Recruiter Fees}"
+AVG_COST_FORMULA = r"\text{Average Cost per Hire} = \frac{\sum \text{Cost per Hire}}{\text{Joined hires with confirmed cost}}"
+
+
+def test_27_calculation_question_returns_exact_equations(admin):
+    pos = log_pos()
+    r = ok(ask(admin, "How is cost per hire calculated?"))
+    data = json.dumps(sent_data(log_since(pos)))
+    assert json.dumps(COST_FORMULA)[1:-1] in data and json.dumps(AVG_COST_FORMULA)[1:-1] in data  # backend supplies the formula
+    assert f"$${COST_FORMULA}$$" in r["answer"] and f"$${AVG_COST_FORMULA}$$" in r["answer"]
+    assert r["observations"] == []
+    assert any(b["title"] == "Hiring metrics" for b in r["blocks"])
+
+
+def test_28_badly_escaped_latex_is_repaired(admin):
+    r = ok(ask(admin, "How is cost per hire calculated? [[badlatex]]"))
+    assert r"$$\text{Cost per Hire} = \frac{a}{b}$$" in r["answer"]
+    assert "\t" not in r["answer"] and "\x0c" not in r["answer"]
+
+
+def test_29_age_formula_offered_to_roles_with_analytics(admin):
+    pos = log_pos()
+    ok(ask(admin, "How is age per hire calculated?"))
+    assert "Actual Joining Date} - \\\\text{CRF Raised Date}" in json.dumps(sent_data(log_since(pos)))

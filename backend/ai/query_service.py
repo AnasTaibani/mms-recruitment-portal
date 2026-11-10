@@ -198,13 +198,18 @@ async def metrics_for(user, reqs=None):
     codes = {r.get("code") for r in reqs} if reqs is not None else None
     hires = [h for h in a["aph"]["hires"] if codes is None or h.get("requisition_code") in codes]
     days = [h["days"] for h in hires if h.get("days") is not None]
-    out = {"age_per_hire": {"definition": "Actual date of joining − CRF raised date (calendar days)", "hires_with_value": len(days),
+    out = {"age_per_hire": {"definition": "Actual date of joining − CRF raised date (calendar days)",
+                            "formulas": [r"\text{Age per Hire (days)} = \text{Actual Joining Date} - \text{CRF Raised Date}",
+                                         r"\text{Average Age per Hire} = \frac{\sum \text{Age per Hire}}{\text{Hires with valid dates}}"],
+                            "hires_with_value": len(days),
                             "average_days": round(sum(days) / len(days), 1) if days else None, "min_days": min(days) if days else None, "max_days": max(days) if days else None,
                             "hires_missing_or_invalid_dates": len(hires) - len(days)}}
     if can(user, "cost.view") and a.get("cost"):
         hc = [h for h in a["cost"]["hire_costs"] if codes is None or h.get("requisition_code") in codes]
         done = [h["total"] for h in hc if h.get("total") is not None]
         out["cost_per_hire"] = {"definition": "Candidate annual CTC + consulting fees + recruiter fees (₹ lakhs); average over joined hires with confirmed cost",
+                                "formulas": [r"\text{Cost per Hire} = \text{Candidate Annual CTC} + \text{Consulting Fees} + \text{Recruiter Fees}",
+                                             r"\text{Average Cost per Hire} = \frac{\sum \text{Cost per Hire}}{\text{Joined hires with confirmed cost}}"],
                                 "joined_hires": len(hc), "hires_with_confirmed_cost": len(done),
                                 "average_lakhs": round(sum(done) / len(done), 2) if done else None, "total_lakhs": round(sum(done), 2) if done else None}
     return out

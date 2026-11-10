@@ -200,3 +200,28 @@ Run the assistant tests (local database only — the test refuses to run against
 - One question at a time per user (a second one while the first is answering gets a "please wait").
 - English only.
 - Not part of this change, but worth knowing: the portal's existing **file upload storage** (resumes/attachments) connects to Emergent's storage service using `EMERGENT_LLM_KEY` at start-up, and `requirements.txt` pins a `litellm` build from Emergent. The assistant uses neither. Moving file storage off Emergent would be a separate change.
+
+---
+
+## Update — 10 Nov 2026: typing effect, equations, optional observations
+
+**What changed**
+1. **Answers type out word by word.** The full answer still arrives from the server in one piece; the drawer reveals it word by word (about 28 ms per word, long answers finish within ~4.5 s). Tables, links and suggestion chips appear once typing finishes. Equations appear whole, never half-typed. Users with "reduce motion" switched on in their device settings see the answer at once.
+2. **Formulas shown as equations.** When a question is about how something is calculated, the answer shows the equation on its own line, e.g.
+   - Cost per Hire = Candidate Annual CTC + Consulting Fees + Recruiter Fees
+   - Average Cost per Hire = Σ Cost per Hire ÷ Joined hires with confirmed cost (shown as a stacked fraction)
+
+   The exact formulas for Cost per Hire and Age per Hire are supplied by the backend (matching the Analytics module), and the model is told to copy them rather than write its own. The model may add one line with the real numbers substituted, only using numbers in the data.
+3. **"Key observations" only when useful.** The model returns none for definitions, "how is X calculated", single numbers, simple lookups and clarifications, and is told not to write generic statements. The box is hidden when there are none.
+
+**Files**
+- `frontend/src/components/assistant/MathFormula.jsx` (new) — small built-in equation renderer (fractions, Σ, ×, ÷, ≈, ≤, ≥, sub/superscripts, named terms). Builds React elements, never HTML, so model output can't inject markup. No new npm package was added. (KaTeX couldn't be installed because the project's lockfile points to Emergent-hosted packages my workspace can't reach, so I didn't add a dependency I couldn't lock.)
+- `frontend/src/components/assistant/AssistantDrawer.jsx` — typing effect, equation rendering, auto-scroll that follows the typing unless you've scrolled up.
+- `backend/ai/response_service.py` — answer rules for equations and optional observations; repairs equations if the model mis-escapes backslashes (e.g. `\text` arriving as a TAB).
+- `backend/ai/query_service.py` — exact formulas added to the Cost per Hire and Age per Hire data.
+- `backend/tests/test_ai_assistant.py` — 3 new tests.
+
+**Tests (stand-in OpenAI server, as before)** — 35 passed (32 earlier + exact equations returned and observations empty for "How is cost per hire calculated?", mis-escaped equations repaired, age-per-hire formula supplied).
+Browser — 9 new checks passed (text grows over time while typing; tables hidden until done; equations render, including a real fraction with Σ; no raw LaTeX visible; no observations box on a definition question; reduced-motion shows the answer at once), and the earlier 17 drawer checks still pass.
+
+**Limitation** — as before, I couldn't call real OpenAI from here. Please ask "How is cost per hire calculated?" with your key and check the model writes the equation lines.

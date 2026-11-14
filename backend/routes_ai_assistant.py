@@ -7,6 +7,7 @@ Nothing is stored: no conversation collection, no transcript logging. Each reque
 permissions and re-reads the database."""
 import asyncio
 import logging
+import re
 import time
 from typing import Optional
 
@@ -17,9 +18,9 @@ from pydantic import BaseModel
 from core import get_user, now_iso
 from ai.config import load_config
 from ai.openai_service import AIError, status as ai_status
-from ai.intent_service import plan_question, merge_scope
+from ai.intent_service import plan_question, merge_scope, keyword_plan
 from ai.query_service import recruitment_snapshot, candidate_lookup, metrics_for, resolve_requisitions
-from ai.response_service import build_blocks, build_links, write_answer
+from ai.response_service import build_blocks, build_links, write_answer, as_user_request
 from ai.context_service import clean_context, clean_history, next_context
 
 router = APIRouter(prefix="/api/ai-assistant")
@@ -42,6 +43,12 @@ def _err(e: AIError):
     return JSONResponse(status_code=e.status, content={"detail": e.message, "code": e.code})
 
 
+def _same_question(a, b):
+    w = lambda x: {t for t in re.findall(r"[a-z0-9]+", (x or "").lower()) if t not in {"would", "you", "like", "do", "want", "should", "i", "the", "a", "for", "this", "show", "me", "tell"}}
+    x, y = w(a), w(b)
+    return bool(x and y) and len(x & y) / len(x | y) >= 0.6
+
+
 @router.post("/chat")
 async def chat(body: ChatIn, user=Depends(get_user)):
     cfg = load_config()
@@ -56,7 +63,11 @@ async def chat(body: ChatIn, user=Depends(get_user)):
     t0 = time.monotonic()
     try:
         history, prev = clean_history(body.conversation_context), clean_context(body.context)
+        q = as_user_request(q)  # a suggestion chip phrased as an offer ("Would you like ...?") is answered, not echoed
         plan, u1 = await plan_question(q, history, prev)
+        if plan["intent"] == "clarify" and _same_question(plan.get("clarification_question"), q):
+            # never ask the user to confirm the question they just asked: answer it in the current scope
+            plan = keyword_plan(q, prev) | {"use_previous_scope": bool(prev)}
         intent = plan["intent"]
         base = {"retrieved_at": now_iso(), "blocks": [], "related_links": [], "observations": []}
         if intent == "greeting":

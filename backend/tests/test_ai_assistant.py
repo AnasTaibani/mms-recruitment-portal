@@ -361,3 +361,19 @@ def test_29_age_formula_offered_to_roles_with_analytics(admin):
     pos = log_pos()
     ok(ask(admin, "How is age per hire calculated?"))
     assert "Actual Joining Date} - \\\\text{CRF Raised Date}" in json.dumps(sent_data(log_since(pos)))
+
+
+# ---------- suggestion chips are the user's own requests; never echoed back (14 Nov) ----------
+def test_30_offer_style_suggestions_are_rewritten(admin):
+    r = ok(ask(admin, "Give me an update on BA requirements [[offers]]"))
+    assert r["follow_up_suggestions"] == ["Show details on past interviews for this requisition", "Show the status of offers made to candidates",
+                                          "Show the current pipeline summary for this requisition"]
+
+
+def test_31_clicked_suggestion_is_answered_not_echoed(admin):
+    first = ok(ask(admin, "Give me an update on BA requirements"))
+    # the old chip text, as an older browser tab might still send it
+    r = ok(ask(admin, "Would you like details on past interviews for this requisition?", first["context"],
+               [{"role": "user", "content": "Give me an update on BA requirements"}, {"role": "assistant", "content": first["answer"]}]))
+    assert r["intent"] != "clarify" and not r["answer"].lower().startswith("would you like")
+    assert facts(r)["matched"] == 2 and r["blocks"]  # answered in the BA scope

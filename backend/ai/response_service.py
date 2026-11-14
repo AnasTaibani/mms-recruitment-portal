@@ -30,8 +30,33 @@ Rules:
   single-number answers, simple lookups and clarifications. Never write generic statements (e.g. "X is a key metric").
 Return JSON: {"answer": "markdown-light text: short paragraphs, '- ' bullets, **bold** allowed, $$...$$ equation lines, no tables",
  "observations": ["0-3 specific insights, or [] (see rules)"],
- "follow_ups": ["3 short follow-up questions relevant to this scope"],
+ "follow_ups": ["3 short next questions the USER could ask, written in the user's voice as a request or question to you,
+   e.g. 'Show past interviews for this requisition', 'What is the status of the offers?'. Never phrase them as offers
+   to the user ('Would you like...', 'Do you want...', 'Should I...')."],
  "show_blocks": subset of ["kpis","pipeline","recruiters","interviews","offers","joinings","metrics","requisitions"] relevant to the question}"""
+
+_OFFER = re.compile(r"^\s*(?:would you like(?: me)?(?: to)?|do you (?:want|need)(?: me)?(?: to)?|should i|shall i|can i|may i|"
+                    r"want me to|would it help(?: if i)?)\s+(?:(?:see|get|know|have|view|provide|show|give|share|check|look at|review|"
+                    r"pull up|list|summari[sz]e)\s+)?(?:you\s+)?", re.I)
+_WH = ("which", "who", "what", "when", "where", "why", "how", "whether", "if")
+
+
+def as_user_request(text: str) -> str:
+    """'Would you like details on past interviews?' -> 'Show details on past interviews'. Other text is returned unchanged."""
+    t = (text or "").strip()
+    m = _OFFER.match(t)
+    if not m:
+        return t
+    rest = t[m.end():].strip().rstrip("?.! ")
+    if not rest:
+        return t
+    rest = rest[0].lower() + rest[1:]
+    if rest.split(" ", 1)[0] in _WH:
+        return f"Tell me {rest}"
+    if rest.startswith("me "):
+        rest = rest[3:]
+    return f"Show {rest}"
+
 
 _CTRL = {"\t": "\\t", "\x0c": "\\f", "\x08": "\\b", "\r": "\\r", "\x0b": "\\v"}
 
@@ -127,4 +152,4 @@ async def write_answer(question, history, data, focus):
         raise AIError("bad_response", "The AI service returned an empty answer. Please try again.", 502)
     strs = lambda k, n: [s.strip()[:200] for s in (raw.get(k) or []) if isinstance(s, str) and s.strip()][:n]
     show = [b for b in (raw.get("show_blocks") or []) if b in BLOCK_KEYS] or default_blocks(focus)
-    return {"answer": repair_latex(answer.strip()[:4000]), "observations": strs("observations", 3), "follow_ups": strs("follow_ups", 4), "show_blocks": show}, usage
+    return {"answer": repair_latex(answer.strip()[:4000]), "observations": strs("observations", 3), "follow_ups": list(dict.fromkeys(as_user_request(f) for f in strs("follow_ups", 4))), "show_blocks": show}, usage

@@ -288,7 +288,8 @@ async def create_application(user, cand, req, note="", status="New"):
         raise HTTPException(409, "This candidate already has an active application for this requisition")
     ts = now_iso()
     app = {"id": new_id(), "code": await next_code("APP", 5), "candidate_id": cand["id"], "requisition_id": req["id"],
-           "recruiter_id": req.get("recruiter_id") or cand.get("recruiter_id"), "status": status,
+           # credit goes to the candidate's recruiter; the requisition's recruiter only when the candidate has none
+           "recruiter_id": cand.get("recruiter_id") or req.get("recruiter_id"), "status": status,
            "stage_entered_at": ts, "closed": status in INACTIVE, "created_at": ts, "updated_at": ts, "created_by": user["id"],
            "history": [{"status": status, "from": None, "at": ts, "by": user["name"], "reason": "", "auto": False, "note": note}]}
     await db.applications.insert_one(app)
@@ -389,6 +390,23 @@ async def get_candidate(cid: str, user=Depends(require("cand.view"))):
     return c
 
 
+async def follow_candidate_recruiter(user, cand, recruiter_id):
+    """Open applications move with the candidate's recruiter (or back to the requisition's when cleared).
+    Closed ones (Joined, rejected, withdrawn...) keep the recruiter who handled them."""
+    moved = 0
+    async for a in db.applications.find({"candidate_id": cand["id"], "closed": False}, {"_id": 0, "id": 1, "requisition_id": 1, "recruiter_id": 1}):
+        new = recruiter_id
+        if not new:
+            req = await db.requisitions.find_one({"id": a["requisition_id"]}, {"_id": 0, "recruiter_id": 1}) or {}
+            new = req.get("recruiter_id")
+        if new != a.get("recruiter_id"):
+            await db.applications.update_one({"id": a["id"]}, {"$set": {"recruiter_id": new, "updated_at": now_iso()}})
+            moved += 1
+    if moved:
+        await log_activity(user, "update", "candidate", cand["id"], f"{cand['code']} {cand['name']}",
+                           f"Recruiter change applied to {moved} open application(s)")
+
+
 @router.put("/candidates/{cid}")
 async def update_candidate(cid: str, body: CandIn, user=Depends(require("cand.manage"))):
     c = await get_visible("candidates", "cand", cid, await get_scope(user))
@@ -405,6 +423,8 @@ async def update_candidate(cid: str, body: CandIn, user=Depends(require("cand.ma
     await db.candidates.update_one({"id": cid}, {"$set": data})
     changed = [k for k, v in data.items() if c.get(k) != v and k not in ("updated_at", "phone_norm", "notice_days")]
     await log_activity(user, "update", "candidate", cid, f"{c['code']} {c['name']}", "Updated: " + ", ".join(changed))
+    if "recruiter_id" in data and data["recruiter_id"] != c.get("recruiter_id"):
+        await follow_candidate_recruiter(user, c, data["recruiter_id"])
     return await get_candidate(cid, user)
 
 

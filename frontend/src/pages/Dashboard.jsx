@@ -14,6 +14,7 @@ import { CountUp, ChartTip, Delta, EASE, Pills, SegBar, SERIES, TONE, Tile, Unav
 import { AXIS, BRAND, NEUTRAL, STATUS } from "@/lib/brand";
 import { download, fmtDate, fmtDateTime } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { PageLoader } from "@/components/common/Loader";
 
 const PERIODS = [["7d", "Last 7 days"], ["30d", "Last 30 days"], ["90d", "Last 90 days"], ["quarter", "This quarter"], ["year", "This year"], ["custom", "Custom range"]];
 const KPI_ICON = { candidates: Users, open_requisitions: Briefcase, hires: UserCheck, screening: Search, interview: CalendarDays, offers_released: FileText, offers_accepted: CheckCircle2 };
@@ -530,7 +531,7 @@ export default function Dashboard() {
         {!(dual && view === "interviews") && <Filters f={f} setF={setF} reqs={reqs} exportMenu={exportMenu} />}
       </div>
       {dual && view === "interviews" ? <InterviewerHome /> : !customReady ? <Unavailable className="min-h-[200px]">Choose a start and end date for the custom range</Unavailable>
-        : !d ? <div className="flex h-60 items-center justify-center text-[14px] text-subtle"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading dashboard…</div> : (
+        : !d ? <PageLoader label="Loading your dashboard" /> : (
           <div className={cn("space-y-4 transition-opacity", loading && "opacity-60")} data-testid="bento-grid">
             <KpiRow d={d} />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

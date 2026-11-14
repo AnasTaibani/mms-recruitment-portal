@@ -222,14 +222,13 @@ export function SelectionDialog({ open, onOpenChange, app, onDone }) {
     { name: "decision_maker", label: "Decision Maker", required: true },
     { name: "selection_date", label: "Selection Date", type: "date", required: true, max: new Date().toISOString().slice(0, 10) },
     { name: "compensation", label: "Selected Compensation (₹ L) — required when Selected", type: "number" },
-    { name: "approval_status", label: "Approval Status", type: "select", options: opts(["Pending", "Approved", "Rejected"]), default: "Pending" },
     { name: "remarks", label: "Remarks (required for reject / hold)", type: "textarea" },
     ...(user.role === "super_admin" ? [{ name: "override_reason", label: "Exception — select without the required interviews (Super Admin, reason)", type: "textarea", full: true,
       help: "Leave blank for a normal selection. Filled in, it records an audited interview waiver." }] : []),
   ];
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title="Record selection decision" description={app ? `${app.candidate_name} · ${app.requisition_title}` : ""} wide
-      fields={fields} initial={{ decision: "Selected", decision_maker: user.name, selection_date: new Date().toISOString().slice(0, 10), approval_status: "Pending" }} testid="selection-form" submitLabel="Record decision"
+      fields={fields} initial={{ decision: "Selected", decision_maker: user.name, selection_date: new Date().toISOString().slice(0, 10) }} testid="selection-form" submitLabel="Record decision"
       onSubmit={async (v) => { try { await api.post("/selections", { ...v, application_id: app.id }); toast.success("Decision recorded"); onOpenChange(false); onDone?.(); } catch (e) { toast.error(errMsg(e)); } }} />
   );
 }

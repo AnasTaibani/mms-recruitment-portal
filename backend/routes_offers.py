@@ -38,12 +38,10 @@ class SelectionIn(BaseModel):
     decision_maker: Optional[str] = None
     selection_date: Optional[str] = None
     compensation: Optional[float] = Field(None, ge=0)
-    approval_status: Optional[str] = None
+    approval_status: Optional[str] = None  # no longer asked for (approval happens on the offer); kept so older clients still work
     remarks: Optional[str] = ""
     override_reason: Optional[str] = None  # Super Admin: select without the required interviews (audited waiver)
 
-
-SELECTION_APPROVAL = ["Pending", "Approved", "Rejected"]
 
 
 @router.post("/selections")
@@ -57,8 +55,8 @@ async def record_selection(body: SelectionIn, user=Depends(require("selection.de
     not_future(body.selection_date, "Selection date")
     if body.decision != "Selected" and not (body.remarks or "").strip():
         raise HTTPException(400, "Remarks are required when rejecting or holding")
-    if body.decision == "Selected" and (body.compensation is None or body.approval_status not in SELECTION_APPROVAL):
-        raise HTTPException(400, "Compensation and approval status are required for a selection")
+    if body.decision == "Selected" and body.compensation is None:
+        raise HTTPException(400, "Compensation is required for a selection")
     if app["status"] == "Joined" or (app["closed"] and app["status"] != "On Hold"):
         raise HTTPException(400, f"Application is {app['status']} — a selection decision cannot be recorded")
     if await db.selections.find_one({"application_id": app["id"], "active": {"$ne": False}, "decision": "Selected"}):
@@ -534,6 +532,8 @@ class HireCostIn(BaseModel):
     ctc: Optional[float] = None             # annual CTC, ₹ lakhs
     consulting_fee: Optional[float] = None  # recruitment partner / consultancy fees, ₹ lakhs (0 allowed)
     recruiter_fee: Optional[float] = None   # recruiter fees, ₹ lakhs (0 allowed)
+    consulting_fee_pct: Optional[float] = None  # optional: fee as % of annual CTC (amount must match)
+    recruiter_fee_pct: Optional[float] = None
     currency: Optional[str] = "INR"
     ctc_basis: Optional[str] = "annual"
     reason: Optional[str] = None            # required when changing a confirmed cost
@@ -542,6 +542,9 @@ class HireCostIn(BaseModel):
 
 def hire_cost_total(hc):
     return round(hc["ctc"] + hc["consulting_fee"] + hc["recruiter_fee"], 4)
+
+
+HIRE_COST_COMPARE = ("ctc", "consulting_fee", "recruiter_fee", "consulting_fee_pct", "recruiter_fee_pct")
 
 
 def validate_hire_cost(body):
@@ -561,6 +564,17 @@ def validate_hire_cost(body):
         raise HTTPException(400, "All amounts must be in INR (₹ lakhs)")
     if (body.ctc_basis or "annual").lower() != "annual":
         raise HTTPException(400, "CTC must be the annual CTC")
+    for k, label in (("consulting_fee", "Consulting fees"), ("recruiter_fee", "Recruiter fees")):
+        pct = getattr(body, f"{k}_pct")
+        if pct is None:
+            vals[f"{k}_pct"] = None
+            continue
+        if not 0 <= pct <= 100:
+            raise HTTPException(400, f"{label} % must be between 0 and 100")
+        expected = round(vals["ctc"] * pct / 100, 4)
+        if abs(expected - vals[k]) > 0.0051:  # allow rounding to the nearest ₹500
+            raise HTTPException(400, f"{label} ₹{vals[k]} L doesn't match {pct:g}% of CTC ₹{vals['ctc']} L (= ₹{expected} L)")
+        vals[f"{k}_pct"] = round(float(pct), 4)
     return vals
 
 
@@ -571,9 +585,17 @@ async def hire_cost_suggestions(app):
     with_amt = [c for c in costs if c.get("amount") is not None]
     part = [c for c in with_amt if c.get("partner_id")]
     rec = [c for c in with_amt if not c.get("partner_id") and c.get("recruiter_id")]
-    return {"ctc": offer.get("ctc") if offer else None, "ctc_source": f"accepted offer {offer['code']}" if offer else None,
+    ctc = offer.get("ctc") if offer else None
+
+    def pct(entries):  # only when one invoice clearly is "x% of this CTC"
+        if ctc and len(entries) == 1 and entries[0].get("fee_percent") is not None \
+                and abs(round(ctc * entries[0]["fee_percent"] / 100, 4) - entries[0]["amount"]) <= 0.0051:
+            return entries[0]["fee_percent"]
+        return None
+    return {"ctc": ctc, "ctc_source": f"accepted offer {offer['code']}" if offer else None,
             "consulting_fee": round(sum(c["amount"] for c in part), 4) if part else None,
             "recruiter_fee": round(sum(c["amount"] for c in rec) , 4) if rec else None,
+            "consulting_fee_pct": pct(part), "recruiter_fee_pct": pct(rec),
             "cost_entries": len(costs)}
 
 
@@ -600,7 +622,7 @@ async def confirm_hire_cost(aid: str, body: HireCostIn, user=Depends(require("co
                  "confirmed_by": (prev or {}).get("confirmed_by", user["name"]), "confirmed_by_id": (prev or {}).get("confirmed_by_id", user["id"]),
                  "confirmed_at": (prev or {}).get("confirmed_at", ts), "updated_by": user["name"], "updated_by_id": user["id"], "updated_at": ts,
                  "version": (prev or {}).get("version", 0) + 1, "candidate_id": app["candidate_id"], "requisition_id": app["requisition_id"]}
-    if prev and all(prev.get(k) == hc[k] for k, _ in HIRE_COST_FIELDS):
+    if prev and all(prev.get(k) == hc.get(k) for k in HIRE_COST_COMPARE):
         return {"hire_cost": prev, "history": app.get("hire_cost_history", []), "unchanged": True}
     entry = {"at": ts, "by": user["name"], "by_id": user["id"], "action": "Updated" if prev else "Confirmed", "reason": reason,
              "previous": {k: prev.get(k) for k in ("ctc", "consulting_fee", "recruiter_fee", "total")} if prev else None,

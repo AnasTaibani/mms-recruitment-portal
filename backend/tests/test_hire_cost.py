@@ -199,3 +199,22 @@ def test_14_analytics(admin):
     # a requisition cannot close while a joined hire lacks confirmed cost — here all are confirmed, so cost is not listed
     rr = admin.put(f"{API}/requisitions/{S['req']}", json={"status": "Closed", "closure_reason": "test"})
     assert "confirmed recruitment cost" not in rr.text
+
+
+# 15. fee % — amount = CTC × % ÷ 100, stored with the cost; mismatches and out-of-range % rejected
+def test_15_fee_percent(admin):
+    cid, aid = to_offer_accepted(admin, "FeePct", ctc=12)
+    # one partner invoice at 7% → the form is pre-filled with 7%
+    cat = ok(admin.post(f"{API}/masters", json={"type": "cost_category", "name": f"TEST_HC Consultancy {TAG}"}))["id"]
+    ok(admin.post(f"{API}/costs", json={"category_id": cat, "partner_name": f"TEST_HC Partner {TAG}", "requisition_id": S["req"], "candidate_id": cid,
+                                        "invoice_no": f"INV-{TAG}", "invoice_date": D(5), "ctc": 12, "fee_percent": 7}))
+    sug = ok(admin.get(f"{API}/applications/{aid}/hire-cost"))["suggested"]
+    assert sug["consulting_fee"] == 0.84 and sug["consulting_fee_pct"] == 7 and sug["recruiter_fee_pct"] is None
+    assert hc(admin, aid, ctc=12, consulting_fee=1, consulting_fee_pct=7, recruiter_fee=0).status_code == 400  # 1 ≠ 7% of 12
+    assert hc(admin, aid, ctc=12, consulting_fee=18, consulting_fee_pct=150, recruiter_fee=0).status_code == 400
+    r = ok(hc(admin, aid, ctc=12, consulting_fee=0.84, consulting_fee_pct=7, recruiter_fee=0.6, recruiter_fee_pct=5))
+    assert r["hire_cost"]["total"] == 13.44 and r["hire_cost"]["consulting_fee_pct"] == 7 and r["hire_cost"]["recruiter_fee_pct"] == 5
+    # changing only the % basis (same amounts, flat fee instead) still needs a reason and is recorded
+    assert hc(admin, aid, ctc=12, consulting_fee=0.84, recruiter_fee=0.6).status_code == 400
+    r = ok(hc(admin, aid, ctc=12, consulting_fee=0.84, recruiter_fee=0.6, reason="Recruiter fee is a flat amount"))
+    assert r["hire_cost"]["recruiter_fee_pct"] is None and r["hire_cost"]["version"] == 2

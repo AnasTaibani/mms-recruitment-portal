@@ -15,6 +15,7 @@ import { FormDialog, SelectField } from "@/components/common/FormDialog";
 import { api, errMsg } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PageLoader } from "@/components/common/Loader";
 
 const PERSON = ["recruiter", "hiring_manager", "interviewer"];
 
@@ -153,7 +154,7 @@ function DataCleanup() {
   const [dbName, setDbName] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
-  if (!st) return <p className="text-sm text-[#9AA2AE]">Loading…</p>;
+  if (!st) return <PageLoader label="Loading settings" />;
   const total = Object.entries(st.counts).reduce((a, [, v]) => a + v, 0);
   const ok = phrase.trim() === st.confirm_phrase && dbName.trim() === st.database;
   const prod = /prod/i.test(st.environment);

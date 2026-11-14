@@ -13,6 +13,8 @@ const FIELDS = [
   ["consulting_fee", "Consulting fees", "Recruitment partner / consultancy — enter 0 if none"],
   ["recruiter_fee", "Recruiter fees", "External recruiter — enter 0 if none"],
 ];
+const PCT = { consulting_fee: "consulting_fee_pct", recruiter_fee: "recruiter_fee_pct" };
+const feeFromPct = (ctc, pct) => (ctc === "" || pct === "" || Number.isNaN(Number(ctc)) || Number.isNaN(Number(pct)) ? "" : String(Math.round(Number(ctc) * Number(pct) * 100) / 10000));
 const rupees = (v) => (v === "" || v == null || Number.isNaN(Number(v)) ? "" : `₹${Math.round(Number(v) * 100000).toLocaleString("en-IN")}`);
 
 // Same rules as the server: blank is not zero, no negatives, CTC > 0, amounts in ₹ lakhs.
@@ -26,6 +28,11 @@ export function checkHireCost(v) {
     else if (Number(raw) > 1000) errors[k] = "Enter in ₹ lakhs — e.g. 6 for ₹6,00,000";
   });
   if (!errors.ctc && Number(v.ctc) <= 0) errors.ctc = "Annual CTC must be greater than zero";
+  Object.entries(PCT).forEach(([k, p]) => {
+    const raw = v[p];
+    if (raw === "" || raw == null) return;
+    if (Number.isNaN(Number(raw)) || Number(raw) < 0 || Number(raw) > 100) errors[k] = "Fee % must be between 0 and 100";
+  });
   return errors;
 }
 
@@ -33,7 +40,7 @@ export function checkHireCost(v) {
 export function HireCostPanel({ app, onSaved, compact }) {
   const [data, setData] = useState(null);
   const [editing, setEditing] = useState(false);
-  const [v, setV] = useState({ ctc: "", consulting_fee: "", recruiter_fee: "" });
+  const [v, setV] = useState({ ctc: "", consulting_fee: "", recruiter_fee: "", consulting_fee_pct: "", recruiter_fee_pct: "" });
   const [reason, setReason] = useState("");
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,7 +49,8 @@ export function HireCostPanel({ app, onSaved, compact }) {
       const { data: d } = await api.get(`/applications/${app.id}/hire-cost`);
       setData(d);
       const base = d.hire_cost || d.suggested || {};
-      setV({ ctc: base.ctc ?? "", consulting_fee: base.consulting_fee ?? "", recruiter_fee: base.recruiter_fee ?? "" });
+      setV({ ctc: base.ctc ?? "", consulting_fee: base.consulting_fee ?? "", recruiter_fee: base.recruiter_fee ?? "",
+        consulting_fee_pct: base.consulting_fee_pct ?? "", recruiter_fee_pct: base.recruiter_fee_pct ?? "" });
       setEditing(!d.hire_cost);
     } catch (e) { toast.error(errMsg(e)); }
   }, [app.id]);
@@ -53,12 +61,21 @@ export function HireCostPanel({ app, onSaved, compact }) {
   const valid = !Object.keys(errors).length;
   const total = valid ? Math.round((Number(v.ctc) + Number(v.consulting_fee) + Number(v.recruiter_fee)) * 10000) / 10000 : null;
   const canConfirm = ["Offer Accepted", "Joined"].includes(data.status);
+  const setCtc = (ctc) => {
+    const next = { ...v, ctc };
+    Object.entries(PCT).forEach(([k, p]) => { if (v[p] !== "" && v[p] != null) next[k] = feeFromPct(ctc, v[p]); });
+    setV(next);
+  };
+  const setPct = (k, pct) => setV({ ...v, [PCT[k]]: pct, [k]: pct === "" ? v[k] : feeFromPct(v.ctc, pct) });
+  const setAmount = (k, amt) => setV({ ...v, [k]: amt, [PCT[k]]: "" });
   const save = async () => {
     setTouched(true);
     if (!valid || (hc && !reason.trim())) return;
     setBusy(true);
     try {
-      await api.put(`/applications/${app.id}/hire-cost`, { ctc: Number(v.ctc), consulting_fee: Number(v.consulting_fee), recruiter_fee: Number(v.recruiter_fee), currency: "INR", ctc_basis: "annual", reason: hc ? reason : undefined });
+      const pct = (p) => (v[p] === "" || v[p] == null ? null : Number(v[p]));
+      await api.put(`/applications/${app.id}/hire-cost`, { ctc: Number(v.ctc), consulting_fee: Number(v.consulting_fee), recruiter_fee: Number(v.recruiter_fee),
+        consulting_fee_pct: pct("consulting_fee_pct"), recruiter_fee_pct: pct("recruiter_fee_pct"), currency: "INR", ctc_basis: "annual", reason: hc ? reason : undefined });
       toast.success(hc ? "Cost details updated" : "Recruitment cost confirmed");
       setReason(""); setTouched(false);
       await load();
@@ -68,7 +85,7 @@ export function HireCostPanel({ app, onSaved, compact }) {
 
   return (
     <div className="space-y-4" data-testid="hire-cost-panel">
-      <p className="text-xs text-subtle">Cost per Hire = Candidate annual CTC + Consulting fees + Recruiter fees. All amounts in ₹ lakhs (INR). Required before the candidate is marked Joined.</p>
+      <p className="text-xs text-subtle">Cost per Hire = Candidate annual CTC + Consulting fees + Recruiter fees. Fee = CTC × Fee % ÷ 100 when a % is entered. All amounts in ₹ lakhs (INR). Required before the candidate is marked Joined.</p>
       {hc && !editing ? (
         <div className="space-y-3">
           <Breakdown hc={hc} />
@@ -84,13 +101,28 @@ export function HireCostPanel({ app, onSaved, compact }) {
         <div className="space-y-3">
           {!hc && data.suggested?.ctc_source && <p className="text-[11px] text-subtle">CTC pre-filled from the {data.suggested.ctc_source}{(data.suggested.consulting_fee != null || data.suggested.recruiter_fee != null) && "; fees from recorded cost entries"} — check before confirming.</p>}
           <div className={compact ? "grid gap-3 sm:grid-cols-3" : "grid gap-3 sm:grid-cols-3"}>
-            {FIELDS.map(([k, label, hint]) => (
-              <div key={k} className="space-y-1">
-                <Label className="text-xs">{label} (₹ L) *</Label>
-                <Input type="number" step="any" min="0" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} onBlur={() => setTouched(true)} data-testid={`hire-cost-${k}`} />
-                <p className={`text-[11px] ${touched && errors[k] ? "text-rose-600" : "text-[#9AA2AE]"}`} data-testid={`hire-cost-${k}-msg`}>{touched && errors[k] ? errors[k] : rupees(v[k]) || hint}</p>
-              </div>
-            ))}
+            {FIELDS.map(([k, label, hint]) => {
+              const p = PCT[k], hasPct = p && v[p] !== "" && v[p] != null;
+              const msg = touched && errors[k] ? errors[k]
+                : hasPct && v[k] !== "" ? `${v[p]}% of ${lakhs(Number(v.ctc))} = ${rupees(v[k])}` : rupees(v[k]) || (p ? `${hint}, or enter a fee %` : hint);
+              return (
+                <div key={k} className="space-y-1">
+                  <Label className="text-xs">{label} (₹ L) *</Label>
+                  <div className="flex gap-1.5">
+                    {p && (
+                      <div className="relative w-[76px] shrink-0">
+                        <Input type="number" step="any" min="0" max="100" value={v[p]} placeholder="Fee" aria-label={`${label} — fee % of CTC`}
+                          onChange={(e) => setPct(k, e.target.value)} onBlur={() => setTouched(true)} className="pr-6" data-testid={`hire-cost-${k}-pct`} />
+                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-subtle">%</span>
+                      </div>
+                    )}
+                    <Input type="number" step="any" min="0" value={v[k]} onBlur={() => setTouched(true)} data-testid={`hire-cost-${k}`} aria-label={`${label} amount in lakhs`}
+                      onChange={(e) => (k === "ctc" ? setCtc(e.target.value) : setAmount(k, e.target.value))} className={hasPct ? "bg-canvas" : undefined} />
+                  </div>
+                  <p className={`text-[11px] ${touched && errors[k] ? "text-rose-600" : "text-[#9AA2AE]"}`} data-testid={`hire-cost-${k}-msg`}>{msg}</p>
+                </div>
+              );
+            })}
           </div>
           <div className="flex items-center justify-between rounded-lg border border-line/80 bg-zinc-900/[0.02] px-3 py-2">
             <span className="text-sm text-[#4B5361]">Cost per Hire</span>
@@ -130,7 +162,8 @@ function Breakdown({ hc }) {
   return (
     <table className="w-full max-w-md text-sm" data-testid="hire-cost-breakdown">
       <tbody>
-        {[["Candidate annual CTC", hc.ctc], ["Consulting fees", hc.consulting_fee], ["Recruiter fees", hc.recruiter_fee]].map(([l, x]) => (
+        {[["Candidate annual CTC", hc.ctc], [`Consulting fees${hc.consulting_fee_pct != null ? ` (${hc.consulting_fee_pct}%)` : ""}`, hc.consulting_fee],
+          [`Recruiter fees${hc.recruiter_fee_pct != null ? ` (${hc.recruiter_fee_pct}%)` : ""}`, hc.recruiter_fee]].map(([l, x]) => (
           <tr key={l}><td className="py-0.5 text-[#4B5361]">{l}</td><td className="py-0.5 text-right">{lakhs(x)}</td><td className="py-0.5 pl-3 text-right text-xs text-[#9AA2AE]">{rupees(x)}</td></tr>
         ))}
         <tr className="border-t border-line font-semibold"><td className="pt-1">Cost per Hire</td><td className="pt-1 text-right">{lakhs(hc.total)}</td><td className="pt-1 pl-3 text-right text-xs text-subtle">{rupees(hc.total)}</td></tr>

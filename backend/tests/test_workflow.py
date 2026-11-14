@@ -82,7 +82,7 @@ def complete_round(a, aid, rnd, n_days, outcome=None):
 
 def select(a, aid, **kw):
     return a.post(f"{API}/selections", json={"application_id": aid, "decision": "Selected", "selection_date": D(10),
-                                             "decision_maker": "Head of Engineering", "compensation": 18, "approval_status": "Approved", **kw})
+                                             "decision_maker": "Head of Engineering", "compensation": 18, **kw})  # no approval status: approval is on the offer
 
 
 def offer_through(a, aid, until="accept", ctc=18):
@@ -366,3 +366,17 @@ def test_15_reports_and_audit(admin):
     for h in hist[1:]:
         assert {"from", "status", "by", "at", "records"} <= set(h), h
     assert any(h.get("records") for h in hist)
+
+
+def test_no_interviews_after_selection(admin):
+    """Once Selected, no further interview rounds and no second selection decision."""
+    aid = S.get("selected_app")
+    if not aid:
+        apps = ok(admin.get(f"{API}/applications", params={"status": "Selected,Offer Accepted,Joined"}))
+        assert apps, "needs an application at or after Selected from earlier tests"
+        aid = apps[0]["id"]
+    app = ok(admin.get(f"{API}/applications/{aid}"))
+    iv = admin.post(f"{API}/interviews", json={"application_id": aid, "round_name": "Extra", "date": D(-2), "start_time": "10:00",
+                                               "end_time": "11:00", "interviewer_ids": ["x"], "force": True})
+    assert iv.status_code == 400 and f"already {app['status']}" in iv.text
+    assert select(admin, aid).status_code in (400, 409)

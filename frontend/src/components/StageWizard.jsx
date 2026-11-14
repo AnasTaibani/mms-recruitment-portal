@@ -215,7 +215,8 @@ function InterviewStep({ step, app, user, can, onSaved }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        {can("interview.manage") && <Button size="sm" onClick={() => setDlg({ kind: "schedule" })} data-testid="wizard-schedule">Schedule a round</Button>}
+        {can("interview.manage") && !["Selected", "Offer Approval Pending", "Offer Released", "Offer Accepted", "Joined"].includes(app.status)
+          && <Button size="sm" onClick={() => setDlg({ kind: "schedule" })} data-testid="wizard-schedule">Schedule a round</Button>}
       </div>
       {ivs.length > 0 && (
         <div className="divide-y divide-zinc-200/70 rounded-lg border border-line/70" data-testid="wizard-interviews">

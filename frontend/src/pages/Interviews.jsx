@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { FeedbackDialog } from "@/components/forms";
 import { api, download, errMsg, fmtDate, fmtDateTime } from "@/lib/api";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/common/Loader";
 
 const RLABEL = { technical: "Technical", communication: "Communication", problem_solving: "Problem solving", relevant_experience: "Relevant exp.", role_fit: "Role fit", overall: "Overall" };
 
@@ -28,7 +29,7 @@ function Detail({ id, onClose, onChanged }) {
   return (
     <Sheet open={!!id} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="interview-detail">
-        {!iv ? <p className="text-sm text-[#9AA2AE]">Loading…</p> : <>
+        {!iv ? <PageLoader label="Loading interview" /> : <>
           <SheetHeader><p className="font-mono text-[11px] text-[#9AA2AE]">{iv.code}</p><SheetTitle>{iv.candidate_name} · Round {iv.round_number}</SheetTitle>
             <p className="text-sm text-subtle">{iv.round_name} · {iv.requisition_title}</p></SheetHeader>
           <div className="my-4 flex flex-wrap gap-2"><StatusBadge status={iv.status} testid="iv-status" /><StatusBadge status={`Feedback ${iv.feedback_status}`} tone="zinc" /><StatusBadge status={iv.outcome} testid="iv-outcome" /></div>

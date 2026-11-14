@@ -15,6 +15,7 @@ import { COLORS, FunnelChart, KpiGrid, axis } from "@/components/analytics/share
 import { download, lakhs, num } from "@/lib/api";
 import { ChartTip } from "@/components/bento";
 import { BRAND, STATUS } from "@/lib/brand";
+import { PageLoader } from "@/components/common/Loader";
 
 const n = (v, s = "") => (v === null || v === undefined ? "N/A" : `${v}${s}`);
 
@@ -80,7 +81,7 @@ export default function Analytics() {
   const [params] = useSearchParams();
   const [f, setF] = useState({});
   const { data: d, loading } = useFetch("/analytics", f);
-  if (loading && !d) return <p className="text-sm text-[#9AA2AE]">Loading analytics…</p>;
+  if (loading && !d) return <PageLoader label="Crunching analytics" />;
   return (
     <div>
       <PageHeader eyebrow="Insights" title="Recruitment Analytics" description="Every metric is computed live from portal records. Funnel counts distinct applications — never interview rounds." />

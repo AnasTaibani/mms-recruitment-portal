@@ -14,6 +14,7 @@ import { CandidateDialog } from "@/components/forms";
 import { HistoryTab } from "@/pages/RequisitionDetail";
 import { api, download, errMsg, fmtDate, fmtDateTime, lakhs } from "@/lib/api";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/common/Loader";
 
 function ApplyDialog({ open, onOpenChange, cand, onDone }) {
   const { data } = useFetch("/requisitions", { status: "Open" }, open);
@@ -57,7 +58,7 @@ export default function CandidateDetail() {
   const { data: c, reload } = useFetch(`/candidates/${id}`);
   const [dlg, setDlg] = useState(null);
   const fileRef = useRef();
-  if (!c) return <p className="text-sm text-[#9AA2AE]">Loading…</p>;
+  if (!c) return <PageLoader label="Loading candidate" />;
   const upload = async (file) => {
     if (!file) return;
     const fd = new FormData();

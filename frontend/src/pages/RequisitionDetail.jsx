@@ -15,6 +15,7 @@ import { CandidateDialog } from "@/components/forms";
 import { ReqForm } from "@/pages/Requisitions";
 import { api, errMsg, fmtDate, fmtDateTime, lakhs } from "@/lib/api";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/common/Loader";
 
 export function HistoryTab({ entity, id }) {
   const { data } = useFetch(`/activity/${entity}/${id}`);
@@ -37,7 +38,7 @@ export default function RequisitionDetail() {
   const { can, meta } = useAuth();
   const { data: r, reload } = useFetch(`/requisitions/${id}`);
   const [dlg, setDlg] = useState(null);
-  if (!r) return <p className="text-sm text-[#9AA2AE]">Loading…</p>;
+  if (!r) return <PageLoader label="Loading requisition" />;
   const apps = r.applications || [];
   const cols = [
     { key: "candidate_name", label: "Candidate", render: (a) => <Link to={`/candidates/${a.candidate_id}`} className="font-medium text-ink hover:underline">{a.candidate_name}</Link> },

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from core import (db, get_user, require, can, now_iso, today, new_id, next_code, log_activity, notify, get_scope,
                   get_visible, masters_map, user_ids_for_person, person_ids, set_app_status, get_settings,
-                  RECOMMENDATIONS, INTERVIEW_MODES)
+                  RECOMMENDATIONS, INTERVIEW_MODES, PIPELINE)
 
 router = APIRouter(prefix="/api")
 OPEN_IV = ["Scheduled", "Rescheduled"]
@@ -114,6 +114,8 @@ async def schedule_interview(body: InterviewIn, user=Depends(require("interview.
     app = await get_visible("applications", "app", data.get("application_id") or "", await get_scope(user))
     if app["closed"] and app["status"] != "On Hold":
         raise HTTPException(400, f"Application is {app['status']} — interviews cannot be scheduled")
+    if app["status"] in PIPELINE[PIPELINE.index("Selected"):]:
+        raise HTTPException(400, f"Candidate is already {app['status']} — no further interviews can be scheduled")
     if not data.get("date") or not data.get("interviewer_ids") or not data.get("round_name"):
         raise HTTPException(400, "Round name, date and at least one interviewer are required")
     from workflow import assert_prerequisites

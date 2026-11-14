@@ -19,12 +19,16 @@ export function useAllowedMoves() {
   };
 }
 
+// Once a candidate is selected, interviews and the selection decision are finished.
+const AFTER_SELECTION = ["Selected", "Offer Approval Pending", "Offer Released", "Offer Accepted", "Joined"];
+
 export function AppActions({ app, onDone }) {
   const { can, meta } = useAuth();
   const allowed = useAllowedMoves()(app.status);
   const [move, setMove] = useState(null);
   const [dlg, setDlg] = useState(null);
-  const any = allowed.length || can("interview.manage") || can("selection.decide") || can("offer.manage")
+  const selected = AFTER_SELECTION.includes(app.status);
+  const any = allowed.length || (!selected && (can("interview.manage") || can("selection.decide"))) || can("offer.manage")
     || (can("cost.view") && ["Offer Accepted", "Joined"].includes(app.status));
   if (!any) return null;
   return (
@@ -44,8 +48,8 @@ export function AppActions({ app, onDone }) {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           )}
-          {can("interview.manage") && !app.closed && <DropdownMenuItem onClick={() => setDlg("schedule")} data-testid="app-action-schedule">Schedule interview</DropdownMenuItem>}
-          {can("selection.decide") && !app.closed && <DropdownMenuItem onClick={() => setDlg("select")} data-testid="app-action-selection">Record selection decision</DropdownMenuItem>}
+          {can("interview.manage") && !app.closed && !selected && <DropdownMenuItem onClick={() => setDlg("schedule")} data-testid="app-action-schedule">Schedule interview</DropdownMenuItem>}
+          {can("selection.decide") && !app.closed && !selected && <DropdownMenuItem onClick={() => setDlg("select")} data-testid="app-action-selection">Record selection decision</DropdownMenuItem>}
           {can("offer.manage") && ["Selected", "Offer Declined", "Offer Revoked"].includes(app.status) && <DropdownMenuItem onClick={() => setDlg("offer")} data-testid="app-action-offer">{app.status === "Selected" ? "Create offer" : "Create re-offer"}</DropdownMenuItem>}
           {can("cost.view") && ["Offer Accepted", "Joined"].includes(app.status) && <DropdownMenuItem onClick={() => setDlg("cost")} data-testid="app-action-cost">Recruitment cost{app.hire_cost ? ` · ₹${app.hire_cost.total} L` : " · not confirmed"}</DropdownMenuItem>}
         </DropdownMenuContent>

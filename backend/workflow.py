@@ -169,7 +169,7 @@ async def evaluate(app, target):
         elif legacy >= IDX["Selected"]:
             steps.append(_step("selection", "Selection", True, "Recorded before workflow controls", legacy=True))
         else:
-            steps.append(_step("selection", "Selection", False, "No selection decision", ["final decision", "decision maker", "selection date", "compensation", "approval status"]))
+            steps.append(_step("selection", "Selection", False, "No selection decision", ["final decision", "decision maker", "selection date", "compensation"]))
 
     if t >= IDX["Offer Approval Pending"]:
         need = {7: ["Approval Pending", "Approved", "Released", "Accepted"], 8: ["Released", "Accepted"]}.get(t, ["Accepted"])

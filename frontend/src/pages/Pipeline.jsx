@@ -14,6 +14,7 @@ import { MoveDialog } from "@/components/forms";
 import { api, download, errMsg } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PageLoader } from "@/components/common/Loader";
 
 function Card({ a, onDone }) {
   return (
@@ -109,7 +110,7 @@ export default function Pipeline() {
           ...[...meta.pipeline, ...meta.terminal].map((s) => ({ value: s, label: s }))], "All stages")}
         {stuck > 0 && <span className="ml-auto flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800" data-testid="stuck-alert"><AlertTriangle className="h-3.5 w-3.5" />{stuck} stuck over {meta.settings.stale_days} days</span>}
       </div>
-      {loading ? <p className="text-sm text-[#9AA2AE]">Loading pipeline…</p> : view === "board" ? <Board apps={apps} reload={reload} /> : <DataTable testid="pipe-table" columns={cols} data={apps} />}
+      {loading ? <PageLoader label="Loading pipeline" /> : view === "board" ? <Board apps={apps} reload={reload} /> : <DataTable testid="pipe-table" columns={cols} data={apps} />}
     </div>
   );
 }

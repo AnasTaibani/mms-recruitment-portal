@@ -41,8 +41,9 @@ ALL_PERMS = {"users.manage", "users.super", "masters.manage", "settings.manage",
              "interview.manage", "feedback.submit", "feedback.view", "selection.decide", "offer.view", "offer.manage",
              "offer.approve", "joining.view", "joining.manage", "cost.view", "cost.manage", "analytics.view",
              "reports.export", "import.run", "activity.view"}
-# Activity Log, Users & Roles, and Master Data & Settings are for the Super Admin only.
-SUPER_ONLY = {"users.super", "users.manage", "masters.manage", "settings.manage", "activity.view"}
+# Recruiters also run Users & Roles and Master Data & Settings (since 15 Nov 2026). Still Super Admin only: the Activity
+# Log, Super Admin accounts (users.super: create/promote/edit/reset a Super Admin), data cleanup and data migrations.
+SUPER_ONLY = {"users.super", "activity.view"}
 PERMS = {
     "super_admin": ALL_PERMS,
     "recruiter": ALL_PERMS - SUPER_ONLY,

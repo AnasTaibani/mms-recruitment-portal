@@ -110,7 +110,7 @@ def main():
     api = Api(a.api)
     login = api.post("/auth/login", {"email": email.lower(), "password": pw})
     api.token = login["access_token"]
-    me = login.get("user", {}).get("name") or "Super Admin"
+    me = login.get("name") or "Super Admin"
 
     masters = api.get("/masters")
     dept, rec = first(masters, "department"), first(masters, "recruiter", name=a.recruiter)

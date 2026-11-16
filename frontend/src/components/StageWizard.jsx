@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { FormDialog, SelectField } from "@/components/common/FormDialog";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -364,12 +365,53 @@ function JoiningStep({ step, app, can, onSaved }) {
       )}
     </div>
   );
-  const got = (j.checklist || []).filter((c) => c.received).length;
+  return <JoiningComplete j={j} app={app} can={can} reload={load} onSaved={onSaved} />;
+}
+
+function JoiningComplete({ j, app, can, reload, onSaved }) {
+  const [date, setDate] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [list, setList] = useState(j.checklist || []);
+  useEffect(() => { setList(j.checklist || []); }, [j]);
+  const manage = can("joining.manage");
+  const got = list.filter((c) => c.received).length;
+  const tick = async (i, received) => {
+    const next = list.map((c, k) => (k === i ? { ...c, received } : c));
+    setList(next);
+    try { await api.put(`/joinings/${j.id}`, { checklist: next }); await onSaved(false); } catch (e) { toast.error(errMsg(e)); setList(list); }
+  };
+  const join = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/applications/${app.id}/status`, { status: "Joined", joining_date: date });
+      toast.success("Marked as Joined");
+      await reload();
+      await onSaved(true);
+    } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
+  };
   return (
-    <div className="space-y-1 text-sm text-[#4B5361]" data-testid="wizard-joining-info">
-      <p>{j.code} · {j.status}{j.tentative_date && ` · tentative ${j.tentative_date}`}{j.confirmed_date && ` · confirmed ${j.confirmed_date}`}</p>
-      <p>Document checklist: {got}/{(j.checklist || []).length} received ({j.checklist_status || "—"}) — manage it on the Joining page.</p>
-      <p className="text-xs text-subtle">Enter the actual date of joining on the summary step to complete the move.</p>
+    <div className="space-y-4 text-sm" data-testid="wizard-joining-info">
+      {(j.tentative_date || j.confirmed_date) && <p className="text-[#4B5361]">{j.tentative_date && `Tentative joining ${j.tentative_date}`}{j.tentative_date && j.confirmed_date && " · "}{j.confirmed_date && `confirmed ${j.confirmed_date}`}</p>}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-[#4B5361]">Document checklist · {got}/{list.length} received <span className="font-normal text-subtle">(optional, saved as you tick)</span></p>
+        {list.length ? (
+          <div className="grid gap-1.5 sm:grid-cols-2" data-testid="wizard-joining-checklist">
+            {list.map((c, i) => (
+              <label key={c.item} className="flex items-center gap-2 text-[13px] text-ink">
+                <Checkbox checked={!!c.received} disabled={!manage} onCheckedChange={(x) => tick(i, !!x)} data-testid={`wizard-doc-${i}`} />{c.item}
+              </label>
+            ))}
+          </div>
+        ) : <p className="text-xs text-subtle">No checklist items. Add them under Master Data → Joining Document Checklist.</p>}
+      </div>
+      {app.status === "Offer Accepted" && manage && (
+        <div className="flex flex-wrap items-end gap-2 border-t border-line/70 pt-3">
+          <div className="space-y-1"><Label className="text-xs">Actual date of joining *</Label>
+            <Input type="date" max={today()} value={date} onChange={(e) => setDate(e.target.value)} className="w-44" data-testid="wizard-joining-date" /></div>
+          <Button size="sm" disabled={!date || busy} onClick={join} data-testid="wizard-mark-joined">
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Mark as Joined</Button>
+        </div>
+      )}
     </div>
   );
 }

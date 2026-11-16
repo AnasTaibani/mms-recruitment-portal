@@ -195,8 +195,10 @@ async def evaluate(app, target):
         if j and j.get("status") == "Joined" and j.get("actual_date"):
             steps.append(_step("joining", "Joining", True, f"{j['code']} joined on {j['actual_date']}", records=[j["id"]]))
         else:
-            steps.append(_step("joining", "Joining", False, f"{j['code']} is {j['status']}" if j else "No joining record",
-                               ["actual date of joining", "document checklist"] if j else ["joining record (created when the offer is accepted)"],
+            got = sum(1 for c in (j or {}).get("checklist") or [] if c.get("received"))
+            docs = f" · documents {got}/{len((j or {}).get('checklist') or [])} received" if j and j.get("checklist") else ""
+            steps.append(_step("joining", "Joining", False, f"{j['code']} is {j['status']}{docs}" if j else "No joining record",
+                               ["actual date of joining"] if j else ["joining record (created when the offer is accepted)"],
                                [j["id"]] if j else []))
     return steps
 

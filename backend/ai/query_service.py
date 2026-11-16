@@ -59,6 +59,9 @@ def _name_match(name, q):
 async def resolve_requisitions(user, scope: dict):
     """Requisitions visible to the user that match the requested scope."""
     reqs = await list_requisitions(user, {})
+    if not can(user, "req.view"):  # e.g. an interviewer: only the roles of interviews they are on
+        mine = {i["requisition_id"] for i in await list_interviews(user, {})}
+        reqs = [r for r in reqs if r["id"] in mine]
     rq, dept, rec = scope.get("requisition_query"), scope.get("department"), scope.get("recruiter")
     out = [r for r in reqs if title_matches(r.get("title"), rq) and (not dept or _name_match(r.get("department"), dept))
            and (not rec or _name_match(r.get("recruiter"), rec))]
@@ -127,9 +130,17 @@ async def recruitment_snapshot(user, scope: dict, focus: list):
             if len(rows) > MAX_ROWS:
                 snap["pipeline"]["applications_sample_note"] = f"first {MAX_ROWS} of {len(rows)}"
 
+    if not can(user, "req.view"):
+        # no requisition details for this role: only the role names of their own interviews
+        snap["requisitions"] = {"interview_roles": sorted({r["title"] for r in reqs}),
+                                "note": "This role sees only the roles of interviews they are on, not requisition details."}
+        missing.append("requisition details and recruiters (your role cannot view requisitions)")
+        reqs_for_recruiters = []
+    else:
+        reqs_for_recruiters = reqs
     # recruiter allocation: requisition owners plus who holds the applications
     rec = defaultdict(lambda: {"requisitions": [], "applications": 0})
-    for r in reqs:
+    for r in reqs_for_recruiters:
         rec[r.get("recruiter") or "Unassigned"]["requisitions"].append(r.get("code"))
     for a in apps:
         rec[a.get("recruiter") or "Unassigned"]["applications"] += 1

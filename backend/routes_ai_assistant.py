@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from core import get_user, now_iso
+from core import can, get_user, now_iso
 from ai.config import load_config
 from ai.openai_service import AIError, status as ai_status
 from ai.intent_service import plan_question, merge_scope, keyword_plan
@@ -98,7 +98,7 @@ async def chat(body: ChatIn, user=Depends(get_user)):
                  round((time.monotonic() - t0) * 1000), sum((u or {}).get("total_tokens") or 0 for u in (u1, u2)))
         return {"answer": out["answer"], "observations": out["observations"],
                 "blocks": [blocks[k] for k in out["show_blocks"] if k in blocks],
-                "follow_up_suggestions": out["follow_ups"], "related_links": build_links(snap, reqs) if snap else [],
+                "follow_up_suggestions": out["follow_ups"], "related_links": build_links(snap, reqs, can(user, "req.view"), can(user, "app.view")) if snap else [],
                 "retrieved_at": (data or {}).get("retrieved_at") or now_iso(), "intent": intent,
                 "context": next_context(plan, ctx_scope, reqs)}
     except AIError as e:

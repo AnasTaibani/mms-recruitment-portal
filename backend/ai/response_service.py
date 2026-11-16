@@ -78,7 +78,7 @@ BLOCK_KEYS = ["kpis", "requisitions", "pipeline", "recruiters", "interviews", "o
 def build_blocks(snap: dict):
     b = {}
     r = snap.get("requisitions")
-    if r:
+    if r and "list" in r:
         b["kpis"] = {"type": "kpis", "title": "Requirement overview", "items": [
             {"label": "Requisitions", "value": r["matched"], "hint": ", ".join(f"{v} {k}" for k, v in r["by_status"].items())},
             {"label": "Approved positions", "value": r["approved_positions_active"], "hint": "open / on hold"},
@@ -118,11 +118,13 @@ def build_blocks(snap: dict):
     return b
 
 
-def build_links(snap: dict, reqs: list):
+def build_links(snap: dict, reqs: list, can_req: bool = True, can_app: bool = True):
     links = []
+    if not can_req:
+        reqs = []
     if len(reqs) == 1:
         links += [{"label": f"Open requisition {reqs[0].get('code')}", "to": f"/requisitions/{reqs[0]['id']}"},
-                  {"label": "View its applications in the pipeline", "to": f"/pipeline?requisition_id={reqs[0]['id']}"}]
+                  *([{"label": "View its applications in the pipeline", "to": f"/pipeline?requisition_id={reqs[0]['id']}"}] if can_app else [])]
     elif reqs:
         links += [{"label": f"{r.get('code')} · {r.get('title')}", "to": f"/requisitions/{r['id']}"} for r in reqs[:3]]
     if snap.get("interviews"):

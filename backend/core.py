@@ -47,7 +47,9 @@ SUPER_ONLY = {"users.super", "activity.view"}
 PERMS = {
     "super_admin": ALL_PERMS,
     "recruiter": ALL_PERMS - SUPER_ONLY,
-    "interviewer": {"req.view", "cand.view", "interview.view", "feedback.submit"},
+    # Interviewers see only the interviews they are on (with the candidate's name and role shown there), never the
+    # requisition or candidate lists. Recruiters/Management who also interview keep their own access.
+    "interviewer": {"interview.view", "feedback.submit"},
     "management": {"req.view", "cand.view", "app.view", "interview.view", "feedback.view", "offer.view",
                    "joining.view", "cost.view", "analytics.view", "reports.export"},
 }

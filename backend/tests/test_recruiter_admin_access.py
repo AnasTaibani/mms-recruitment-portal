@@ -70,3 +70,21 @@ def test_still_super_admin_only(ctx):
     assert rec.get(f"{API}/admin/data-status").status_code in (403, 404)
     for path in ("/admin/migrations/joined-to-screening/preview",):
         assert rec.get(f"{API}{path}").status_code in (403, 404, 405)
+
+
+def test_interviewer_cannot_see_requisitions_or_candidates(ctx):
+    admin = ctx["admin"]
+    email = f"ra_ivonly_{TAG}@mms.test"
+    admin.post(f"{API}/users", json={"email": email, "name": f"TEST_RA Interviewer Only {TAG}", "role": "interviewer", "password": PW})
+    iv, me = login(email, PW)
+    assert not {"req.view", "cand.view"} & set(me["permissions"])
+    for path in ("/requisitions", "/candidates", "/applications", "/candidates/check-duplicates?email=a@b.c"):
+        assert iv.get(f"{API}{path}").status_code == 403, path
+    any_req = admin.get(f"{API}/requisitions").json()[0]["id"]
+    any_cand = admin.get(f"{API}/candidates").json()[0]["id"]
+    assert iv.get(f"{API}/requisitions/{any_req}").status_code == 403
+    assert iv.get(f"{API}/candidates/{any_cand}").status_code == 403
+    assert iv.get(f"{API}/interviews").status_code == 200  # their own interviews still work
+    # Management and Recruiters, who also interview, keep their own access
+    rec = ctx["rec"]
+    assert rec.get(f"{API}/requisitions").status_code == 200 and rec.get(f"{API}/candidates").status_code == 200

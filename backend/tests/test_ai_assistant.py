@@ -214,6 +214,10 @@ def test_13_interviewer_sees_only_own_interviews_no_pipeline():
     assert "TEST_AI Cand3" not in blob  # the other interview's candidate (not on their panel) never reaches the LLM
     assert "@mms.test" not in blob and "98765" not in blob
     assert "TEST_AI Cand0" in json.dumps(data.get("interviews"))  # their own interview IS visible
+    reqs = data.get("requisitions") or {}
+    assert "list" not in reqs and "approved_positions_all" not in reqs  # no requisition details
+    assert set(reqs.get("interview_roles", [])) <= {f"TEST_AI Business Analyst {TAG}"}  # only roles of their own interviews
+    assert not data.get("recruiters")
 
 
 def test_14_management_interview_details_limited_to_assigned():

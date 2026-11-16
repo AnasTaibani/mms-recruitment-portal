@@ -85,6 +85,47 @@ async def record_selection(body: SelectionIn, user=Depends(require("selection.de
     return doc
 
 
+class SelectionEditIn(BaseModel):
+    selection_date: Optional[str] = None
+    decision_maker: Optional[str] = None
+    compensation: Optional[float] = Field(None, ge=0)
+    remarks: Optional[str] = None
+    reason: str = ""
+
+
+@router.put("/selections/{sid}")
+async def edit_selection(sid: str, body: SelectionEditIn, user=Depends(require("selection.decide"))):
+    """Correct the date, decision maker, compensation or remarks of the active selection. The decision is not editable."""
+    from workflow import check_order, not_future, stage_dates
+    s = await db.selections.find_one({"id": sid, "active": {"$ne": False}}, {"_id": 0})
+    if not s:
+        raise HTTPException(404, "Selection not found (or it was replaced by a newer one)")
+    await get_visible("applications", "app", s["application_id"], await get_scope(user))
+    if not body.reason.strip():
+        raise HTTPException(400, "Give a short reason for the change")
+    new = {}
+    if body.selection_date is not None and body.selection_date != s.get("selection_date"):
+        not_future(body.selection_date, "Selection date")
+        check_order("selection", body.selection_date, await stage_dates(s["application_id"]))
+        new["selection_date"] = body.selection_date
+    if body.decision_maker is not None and body.decision_maker.strip() and body.decision_maker.strip() != s.get("decision_maker"):
+        new["decision_maker"] = body.decision_maker.strip()
+    if body.compensation is not None and body.compensation != s.get("compensation"):
+        new["compensation"] = body.compensation
+    if body.remarks is not None and body.remarks != s.get("remarks", ""):
+        if s["decision"] != "Selected" and not body.remarks.strip():
+            raise HTTPException(400, "Remarks are required when rejecting or holding")
+        new["remarks"] = body.remarks
+    if not new:
+        raise HTTPException(400, "Nothing changed")
+    changes = {k: [s.get(k), v] for k, v in new.items()}
+    edit = {"at": now_iso(), "by": user["name"], "by_id": user["id"], "reason": body.reason.strip(), "changes": changes}
+    await db.selections.update_one({"id": sid}, {"$set": new, "$push": {"edits": edit}})
+    await log_activity(user, "selection_edit", "application", s["application_id"], "Selection record",
+                       "; ".join(f"{k}: {o} → {n}" for k, (o, n) in changes.items()) + f" — {body.reason.strip()}")
+    return await db.selections.find_one({"id": sid}, {"_id": 0})
+
+
 @router.get("/selections")
 async def list_selections(application_id: Optional[str] = None, user=Depends(require("app.view"))):
     scope = await get_scope(user)

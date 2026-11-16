@@ -229,3 +229,32 @@ def is_override_user(user):
 def not_future(d, label):
     if d and d > today():
         raise HTTPException(400, f"{label} cannot be in the future")
+
+
+
+async def stage_dates(app_id):
+    """Dates of the active screening, shortlisting and selection records and the interviews, for order checks on edits."""
+    out = {}
+    async for r in db.stage_reviews.find({"application_id": app_id, "active": True}, {"_id": 0, "stage": 1, "date": 1}):
+        out[r["stage"].lower()] = r["date"]
+    sel = await db.selections.find_one({"application_id": app_id, "active": {"$ne": False}}, {"_id": 0, "selection_date": 1})
+    if sel:
+        out["selection"] = sel.get("selection_date")
+    ivs = [i["date"] async for i in db.interviews.find({"application_id": app_id, "status": {"$nin": ["Cancelled"]}}, {"_id": 0, "date": 1}) if i.get("date")]
+    out["first_interview"] = min(ivs) if ivs else None
+    out["last_completed_interview"] = max([i["date"] async for i in db.interviews.find(
+        {"application_id": app_id, "status": "Completed"}, {"_id": 0, "date": 1}) if i.get("date")] or [None], key=lambda x: x or "")
+    return out
+
+
+def check_order(stage, date, d):
+    """Edited dates must stay in order: screening <= shortlisting <= first interview ... last completed interview <= selection."""
+    rules = {"screening": [("<=", "shortlisting", "the shortlisting date")],
+             "shortlisting": [(">=", "screening", "the screening date"), ("<=", "first_interview", "the first interview"),
+                              ("<=", "selection", "the selection date")],
+             "selection": [(">=", "shortlisting", "the shortlisting date"), (">=", "last_completed_interview", "the last completed interview")]}
+    for op, key, label in rules[stage]:
+        other = d.get(key)
+        if other and ((op == "<=" and date > other) or (op == ">=" and date < other)):
+            word = "after" if op == "<=" else "before"
+            raise HTTPException(400, f"{stage.title()} date {date} can't be {word} {label} ({other})")

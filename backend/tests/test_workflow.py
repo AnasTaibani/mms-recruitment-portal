@@ -380,3 +380,41 @@ def test_no_interviews_after_selection(admin):
                                                "end_time": "11:00", "interviewer_ids": ["x"], "force": True})
     assert iv.status_code == 400 and f"already {app['status']}" in iv.text
     assert select(admin, aid).status_code in (400, 409)
+
+
+# ---------- editing saved stage records (16 Nov) ----------
+def test_edit_stage_records(admin):
+    _, aid = new_cand(admin, "EditRec")
+    screen_and_shortlist(admin, aid)                       # screening D20, shortlisting D19
+    complete_round(admin, aid, 1, 15)
+    complete_round(admin, aid, 2, 12, outcome="Selected")  # interviews D15, D12
+    sel = ok(select(admin, aid))                           # selection D10
+    revs = {r["stage"]: r for r in ok(admin.get(f"{API}/applications/{aid}/stage-reviews")) if r["active"]}
+    scr, sho = revs["Screening"], revs["Shortlisting"]
+    put = lambda rid, **b: admin.put(f"{API}/applications/{aid}/stage-reviews/{rid}", json=b)
+
+    err(put(scr["id"], date=D(21)), 400, "reason")                                     # a reason is required
+    err(put(scr["id"], date=(TODAY + timedelta(days=1)).isoformat(), reason="typo"), 400)  # never in the future
+    err(put(scr["id"], date=D(18), reason="typo"), 400, "shortlisting")                # can't move after shortlisting
+    err(put(sho["id"], date=D(14), reason="typo"), 400, "first interview")              # can't move after the first interview
+    err(put(scr["id"], owner="Not A Recruiter", reason="typo"), 400, "recruiters")
+    err(put(scr["id"], date=scr["date"], reason="typo"), 400, "Nothing changed")
+
+    r = ok(put(scr["id"], date=D(21), owner="TEST_Screener", remarks="Phone screen", reason="Entered the wrong day", decision="Rejected"))
+    assert r["date"] == D(21) and r["decision"] == "Cleared"                           # decision is never changed by an edit
+    assert r["edits"][-1]["changes"]["date"] == [D(20), D(21)] and r["edits"][-1]["reason"] == "Entered the wrong day"
+    assert ok(admin.get(f"{API}/applications/{aid}"))["status"] == "Selected"           # nothing moved
+
+    sput = lambda **b: admin.put(f"{API}/selections/{sel['id']}", json=b)
+    err(sput(selection_date=D(13), reason="typo"), 400, "last completed interview")    # before the last completed round (D12)
+    s = ok(sput(selection_date=D(11), decision_maker="CTO", compensation=19.5, reason="Approved a day earlier by the CTO"))
+    assert (s["selection_date"], s["decision_maker"], s["compensation"], s["decision"]) == (D(11), "CTO", 19.5, "Selected")
+    assert len(s["edits"]) == 1 and set(s["edits"][0]["changes"]) == {"selection_date", "decision_maker", "compensation"}
+
+    acts = ok(admin.get(f"{API}/activity", params={"entity_id": aid}))
+    acts = acts.get("items", acts) if isinstance(acts, dict) else acts
+    assert {"stage_review_edit", "selection_edit"} <= {x.get("action") for x in acts}
+
+    iv = sess(S["email_iv1"]) if "email_iv1" in S else None
+    if iv:
+        assert iv.put(f"{API}/selections/{sel['id']}", json={"decision_maker": "X", "reason": "x"}).status_code == 403

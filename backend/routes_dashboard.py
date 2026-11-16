@@ -10,6 +10,7 @@ from statistics import median
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from funnel_breakdown import add_gaps
 from core import db, require, can, get_scope, today, days_between, INACTIVE, PIPELINE
 from routes_recruit import list_applications, list_requisitions, list_candidates
 from routes_interviews import list_interviews
@@ -195,11 +196,13 @@ async def dashboard(request: Request, user=Depends(require("analytics.view"))):
     # ---------- funnel (applications created in the period) ----------
     cohort = [a for a in apps if within(a["created_at"])]
     funnel, prev_n = [], None
-    for label, i, statuses in FUNNEL:
-        n = sum(1 for a in cohort if a["status"] == "Joined") if label == "Joined" else sum(1 for a in cohort if a["_idx"] >= i)
+    reach = lambda a, k: a["status"] == "Joined" if FUNNEL[k][0] == "Joined" else a["_idx"] >= FUNNEL[k][1]
+    for k, (label, i, statuses) in enumerate(FUNNEL):
+        n = sum(1 for a in cohort if reach(a, k))
         funnel.append({"stage": label, "count": n, "conversion": pct(n, prev_n) if prev_n is not None else None,
-                       "drop_off": (prev_n - n) if prev_n is not None else None, "statuses": statuses})
+                       "drop_off": (prev_n - n) if prev_n is not None else None, "statuses": statuses, "_idx": i})
         prev_n = n
+    outcomes = add_gaps(funnel, cohort, reach)
     overall = pct(funnel[-1]["count"], funnel[0]["count"])
 
     # ---------- analytics module (same calculations as the Analytics page & exports) ----------
@@ -318,7 +321,7 @@ async def dashboard(request: Request, user=Depends(require("analytics.view"))):
     return {"period": {"key": period, "start": start.isoformat(), "end": end.isoformat(), "previous_start": pstart.isoformat(),
                        "previous_end": pend.isoformat(), "granularity": gran},
             "hero": hero, "trend": {"series": [{"key": k, "label": l} for k, l in series_kinds], "points": trend},
-            "funnel": {"stages": funnel, "overall_conversion": overall, "cohort": len(cohort), "cohort_candidates": len({a["candidate_id"] for a in cohort})},
+            "funnel": {"stages": funnel, "overall_conversion": overall, "cohort": len(cohort), "cohort_candidates": len({a["candidate_id"] for a in cohort}), "outcomes": outcomes},
             "cost": cost, "age_per_hire": age, "sources": sources, "recruiters": recruiters, "requisitions": requisitions,
             "upcoming_interviews": upcoming, "activity": feed, "pending": pending, "distribution": distribution,
             "total_applications": len(apps)}

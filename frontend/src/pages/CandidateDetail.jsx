@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { FormDialog } from "@/components/common/FormDialog";
 import { EmptyState } from "@/components/common/DataTable";
 import { AppActions } from "@/components/AppActions";
+import { StageRecords } from "@/components/StageRecords";
 import { CandidateDialog } from "@/components/forms";
 import { HistoryTab } from "@/pages/RequisitionDetail";
 import { api, download, errMsg, fmtDate, fmtDateTime, lakhs } from "@/lib/api";
@@ -43,6 +44,7 @@ function Applications({ c, reload }) {
             </div>
             <div className="flex items-center gap-2"><StatusBadge status={a.status} testid={`application-status-${a.code}`} /><AppActions app={a} onDone={reload} /></div>
           </div>
+          <StageRecords app={a} onChanged={reload} />
           <div className="mt-4 border-t border-[#EEF1F5] pt-4">
             <Timeline items={[...(a.history || [])].reverse().map((h) => ({ title: h.from ? `${h.from} → ${h.status}` : h.status, details: [h.reason, h.note, h.override && `EXCEPTION: ${h.override_reason}`].filter(Boolean).join(" · "), meta: `${h.by}${h.auto ? " (automatic)" : ""} · ${fmtDateTime(h.at)}` }))} />
           </div>

@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from funnel_breakdown import add_gaps
 from core import (db, get_user, require, can, today, days_between, effective_start, log_activity, get_scope, PIPELINE,
                   IMPLIED_STAGE, INACTIVE)
 from routes_recruit import list_applications, list_requisitions, list_candidates
@@ -193,11 +194,13 @@ async def compute(user, f):
         cands = await list_candidates(user, {k: f.get(k) for k in ("source_id", "partner_id", "recruiter_id")})
         kpis["total_candidates"] = len([c for c in cands if not dated or in_range(c["created_at"][:10], f)])
     funnel, prev = [], None
-    for label, idx in FUNNEL:
-        n = count(lambda a: a["_idx"] >= idx) if idx < 10 else count(lambda a: a["status"] == "Joined")
+    reach = lambda a, k: a["status"] == "Joined" if FUNNEL[k][1] >= 10 else a["_idx"] >= FUNNEL[k][1]
+    for k, (label, idx) in enumerate(FUNNEL):
+        n = count(lambda a: reach(a, k))
         funnel.append({"stage": label, "count": n, "conversion": pct(n, prev) if prev is not None else 100.0 if n else None,
-                       "of_total": pct(n, len(apps))})
+                       "of_total": pct(n, len(apps)), "_idx": idx})
         prev = n
+    funnel_outcomes = add_gaps(funnel, apps, reach)
 
     costs = await list_costs(user, {k: f.get(k) for k in ("date_from", "date_to", "department_id", "role", "recruiter_id", "partner_id", "requisition_id")}) if can(user, "cost.view") else None
 
@@ -322,7 +325,7 @@ async def compute(user, f):
                 months[o["release_date"][:7]]["offers"] += 1
     trends = [{"month": k, **v} for k, v in sorted(months.items())][-12:]
     status_breakdown = [{"status": k, "count": v} for k, v in sorted(by_status.items(), key=lambda x: -x[1])]
-    return {"kpis": kpis, "funnel": funnel, "recruiters": recruiters, "roles": roles, "departments": departments,
+    return {"kpis": kpis, "funnel": funnel, "funnel_outcomes": funnel_outcomes, "recruiters": recruiters, "roles": roles, "departments": departments,
             "sources": sources, "partners": partners, "cost": cost, "cycle": cycle, "trends": trends, "aph": aph,
             "status_breakdown": status_breakdown}
 
@@ -472,6 +475,16 @@ async def export_report(rtype: str, request: Request, user=Depends(get_user)):
             headers = list(rows[0].keys()) if rows else ["Period"]
             return to_file(headers, [list(r.values()) for r in rows], fmt, f"summary-{f.get('period', 'monthly')}")
         data = await compute(user, f)
+        if rtype == "funnel":  # stage counts plus where everyone went between stages
+            reasons = [r["reason"] for r in data["funnel_outcomes"]["by_reason"]]
+            heads = ["Stage", "Applications", "Conversion %", "% of total", "Next stage", "Moved on", "Still here", "Exited"] + reasons
+            rows = []
+            for s in data["funnel"]:
+                g = s.get("gap") or {}
+                ex = {e["reason"]: e["count"] for e in g.get("exits", [])}
+                rows.append([s["stage"], s["count"], s["conversion"], s["of_total"], g.get("to", ""), g.get("moved", ""),
+                             g.get("still", ""), g.get("exited", "")] + [ex.get(r, 0) if g else "" for r in reasons])
+            return to_file(heads, rows, fmt, "funnel")
         key = {"recruiters": "recruiters", "funnel": "funnel", "sources": "sources", "departments": "departments"}[rtype]
         rows = data[key]
         headers = list(rows[0].keys()) if rows else ["No data"]

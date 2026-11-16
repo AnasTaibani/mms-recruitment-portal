@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, CircleDashed, Info, Loader2, ShieldAlert, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleDashed, Info, Loader2, Pencil, ShieldAlert, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { FormDialog, SelectField } from "@/components/common/FormDialog";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { FeedbackDialog, OfferDialog, ScheduleDialog, SelectionDialog } from "@/components/forms";
 import { HireCostPanel } from "@/components/HireCost";
+import { EditRecordDialog } from "@/components/StageRecords";
 import { useAuth } from "@/context/AuthContext";
 import { api, errMsg } from "@/lib/api";
 import { toast } from "sonner";
@@ -154,6 +155,7 @@ function StepPanel({ step, app, rd, user, can, onSaved }) {
   return (
     <div className="space-y-4" data-testid={`wizard-panel-${step.key}`}>
       <Missing step={step} />
+      {step.done && ["screening", "shortlisting", "selection"].includes(step.key) && <WizardEditRecord step={step} app={app} can={can} onSaved={onSaved} />}
       {Comp && <Comp step={step} app={app} rd={rd} user={user} can={can} onSaved={onSaved} />}
     </div>
   );
@@ -342,6 +344,32 @@ function OfferStep({ step, app, rd, can, onSaved }) {
 /* ---- Recruitment cost confirmation (required before Joined) ---- */
 function CostStep({ app, onSaved }) {
   return <HireCostPanel app={app} compact onSaved={() => onSaved(true)} />;
+}
+
+/* ---- edit a completed screening / shortlisting / selection record ---- */
+function WizardEditRecord({ step, app, can, onSaved }) {
+  const [rec, setRec] = useState(null);
+  const [open, setOpen] = useState(false);
+  const sel = step.key === "selection";
+  if (!(sel ? can("selection.decide") : can("app.move"))) return null;
+  const start = async () => {
+    try {
+      if (sel) {
+        const { data } = await api.get("/selections", { params: { application_id: app.id } });
+        const s = data.find((x) => x.active !== false);
+        if (s) setRec({ ...s, kind: "selection", stage: "Selection" });
+      } else {
+        const { data } = await api.get(`/applications/${app.id}/stage-reviews`);
+        const r = data.find((x) => x.active && x.stage.toLowerCase() === step.key);
+        if (r) setRec({ ...r, kind: "review" });
+      }
+      setOpen(true);
+    } catch (e) { toast.error(errMsg(e)); }
+  };
+  return (<>
+    <Button size="sm" variant="outline" onClick={start} data-testid={`wizard-edit-${step.key}`}><Pencil className="mr-1 h-3.5 w-3.5" />Edit date / {sel ? "decision maker" : "owner"}</Button>
+    <EditRecordDialog open={open && !!rec} onOpenChange={setOpen} record={rec} onSaved={() => onSaved(false)} />
+  </>);
 }
 
 /* ---- Joining ---- */

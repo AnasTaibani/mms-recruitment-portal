@@ -130,3 +130,39 @@ def test_people_vs_applications_reconcile(admin):
     assert h["value"] == 3 and h["detail"] is None
     assert d["funnel"]["cohort"] == 4 and d["funnel"]["cohort_candidates"] == 3
     assert hero(d, "hires")["detail"] is None  # nobody joined twice
+
+
+# ---------- funnel: where every application went (16 Nov) ----------
+def test_funnel_gaps_account_for_everyone(admin):
+    dept = ok(admin.post(f"{API}/masters", json={"type": "department", "name": f"TEST_FG Dept {TAG}"}))["id"]
+    owner = ok(admin.post(f"{API}/masters", json={"type": "recruiter", "name": f"TEST_FG Rec {TAG}"}))
+    admin.post(f"{API}/masters", json={"type": "recruiter", "name": "TEST_Screener"})
+    req = ok(admin.post(f"{API}/requisitions", json={"title": f"TEST_FG Role {TAG}", "positions": 4, "crf_date": D(10), "status": "Open",
+                                                      "department_id": dept, "recruiter_id": owner["id"]}))["id"]
+    aid = {}
+    for k in ("new", "cvrej", "withdrawn", "still"):
+        c = ok(admin.post(f"{API}/candidates", json={"name": f"TEST_FG {k} {TAG}", "email": f"fg_{k}_{TAG}@mms.test", "requisition_id": req, "force": True}))
+        aid[k] = next(a["id"] for a in ok(admin.get(f"{API}/applications", params={"requisition_id": req})) if a["candidate_id"] == c["id"])
+    ok(admin.post(f"{API}/applications/{aid['cvrej']}/status", json={"status": "CV Rejected", "reason": "Not a fit"}))
+    for k in ("withdrawn", "still"):
+        ok(admin.post(f"{API}/applications/{aid[k]}/stage-reviews", json={"stage": "Screening", "date": D(2), "owner": "TEST_Screener", "decision": "Cleared"}))
+        ok(admin.post(f"{API}/applications/{aid[k]}/stage-reviews", json={"stage": "Shortlisting", "date": D(1), "owner": "TEST_Screener", "decision": "Shortlisted"}))
+    ok(admin.post(f"{API}/applications/{aid['withdrawn']}/status", json={"status": "Candidate Withdrawn", "reason": "Took another offer"}))
+
+    for d, stages, o in [(x := ok(admin.get(f"{API}/dashboard", params={"period": "year", "department_id": dept})), x["funnel"]["stages"], x["funnel"]["outcomes"]),
+                         (y := ok(admin.get(f"{API}/analytics", params={"department_id": dept})), y["funnel"], y["funnel_outcomes"])]:
+        for s in stages[:-1]:
+            assert s["count"] - s["gap"]["moved"] == s["gap"]["still"] + s["gap"]["exited"]
+        g = {s["stage"]: s["gap"] for s in stages[:-1]}
+        first = stages[0]["gap"]
+        assert first["still"] == 1 and first["exited"] == 0                     # "new": never screened, still active
+        sc = g["Screening"]
+        assert sc["exited"] == 1 and {e["reason"]: e["count"] for e in sc["exits"]}["CV Rejected"] == 1
+        sh = g["Shortlisted"]
+        assert sh["still"] == 1 and {e["reason"]: e["count"] for e in sh["exits"]}["Candidate Withdrawn"] == 1
+        assert sh["still_statuses"] == ["Shortlisted"]
+        assert (o["joined"], o["in_progress"], o["exited"]) == (0, 2, 2)
+        assert {r["reason"]: r["count"] for r in o["by_reason"]}["CV Rejected"] == 1
+        assert {k["kind"]: k["count"] for k in o["by_kind"]} == {"company": 1, "candidate": 1, "hold": 0}
+    r = admin.get(f"{API}/reports/funnel", params={"format": "csv", "department_id": dept})
+    assert r.status_code == 200 and "Still here" in r.text and "Candidate Withdrawn" in r.text

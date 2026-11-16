@@ -578,6 +578,48 @@ async def add_stage_review(aid: str, body: StageReviewIn, user=Depends(require("
     return doc
 
 
+class StageReviewEditIn(BaseModel):
+    date: Optional[str] = None
+    owner: Optional[str] = None
+    remarks: Optional[str] = None
+    reason: str = ""
+
+
+@router.put("/applications/{aid}/stage-reviews/{rid}")
+async def edit_stage_review(aid: str, rid: str, body: StageReviewEditIn, user=Depends(require("app.move"))):
+    """Correct the date, owner or remarks of a saved screening/shortlisting record. The decision itself is not editable."""
+    from workflow import check_order, not_future, stage_dates
+    await get_visible("applications", "app", aid, await get_scope(user))
+    r = await db.stage_reviews.find_one({"id": rid, "application_id": aid, "active": True}, {"_id": 0})
+    if not r:
+        raise HTTPException(404, "Record not found (or it was replaced by a newer one)")
+    if not body.reason.strip():
+        raise HTTPException(400, "Give a short reason for the change")
+    new = {}
+    if body.date is not None and body.date != r["date"]:
+        not_future(body.date, f"{r['stage']} date")
+        check_order(r["stage"].lower(), body.date, await stage_dates(aid))
+        new["date"] = body.date
+    if body.owner is not None and body.owner.strip() and body.owner.strip().lower() != r["owner"].lower():
+        owner = await db.masters.find_one({"type": "recruiter", "active": {"$ne": False},
+                                           "name": {"$regex": f"^{re.escape(body.owner.strip())}$", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1})
+        if not owner:
+            raise HTTPException(400, "Owner must be one of the recruiters in Master Data")
+        new["owner"], new["owner_id"] = owner["name"], owner["id"]
+    if body.remarks is not None and body.remarks != r.get("remarks", ""):
+        if r["decision"] not in ("Cleared", "Shortlisted") and not body.remarks.strip():
+            raise HTTPException(400, "Remarks are required when rejecting or holding")
+        new["remarks"] = body.remarks
+    if not new:
+        raise HTTPException(400, "Nothing changed")
+    changes = {k: [r.get(k), v] for k, v in new.items() if k != "owner_id"}
+    edit = {"at": now_iso(), "by": user["name"], "by_id": user["id"], "reason": body.reason.strip(), "changes": changes}
+    await db.stage_reviews.update_one({"id": rid}, {"$set": new, "$push": {"edits": edit}})
+    await log_activity(user, "stage_review_edit", "application", aid, f"{r['stage']} record",
+                       "; ".join(f"{k}: {o} → {n}" for k, (o, n) in changes.items()) + f" — {body.reason.strip()}")
+    return await db.stage_reviews.find_one({"id": rid}, {"_id": 0})
+
+
 class WaiverIn(BaseModel):
     reason: str
 

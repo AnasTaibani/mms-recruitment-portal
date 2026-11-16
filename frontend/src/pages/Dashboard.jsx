@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, BadgeCheck, Briefcase, CalendarClock, CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, Clock3, Download, FileText, Loader2, PauseCircle, Search, UserCheck, Users } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Briefcase, CalendarClock, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Clock3, Download, FileText, Loader2, PauseCircle, Search, UserCheck, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/lib/useFetch";
 import { PageHeader } from "@/components/common/Page";
@@ -149,48 +149,121 @@ function TrendTile({ d, gran, setGran }) {
 }
 
 /* ---------- funnel ---------- */
+// where applications went between stages: moved on · still here · exited (by recorded reason)
+const OUT = { moved: BRAND.royal, still: "#E9B949", company: "#C2413B", candidate: "#E07B39", hold: "#9AA2AE" };
+const pipeTo = (statuses) => `/pipeline?status=${encodeURIComponent(statuses.join(","))}`;
+
 function FunnelTile({ d }) {
   const nav = useNavigate();
   const mounted = useMounted();
+  const [open, setOpen] = useState(null);
   const st = d.funnel.stages;
+  const o = d.funnel.outcomes;
   const n = st.length;
+  const top = st[0]?.count || 1;
   return (
-    <Tile title={<span className="flex flex-col">Recruitment funnel{d.funnel.cohort ? <span className="text-[13px] font-normal text-subtle" data-testid="funnel-cohort">{d.funnel.cohort} application{d.funnel.cohort === 1 ? "" : "s"} from {d.funnel.cohort_candidates} candidate{d.funnel.cohort_candidates === 1 ? "" : "s"}</span> : null}</span>} info="Applications created in the period; each stage counts applications that reached it" className="lg:col-span-5" testid="dashboard-funnel"
+    <Tile title={<span className="flex flex-col">Recruitment funnel{d.funnel.cohort ? <span className="text-[13px] font-normal text-subtle" data-testid="funnel-cohort">{d.funnel.cohort} application{d.funnel.cohort === 1 ? "" : "s"} from {d.funnel.cohort_candidates} candidate{d.funnel.cohort_candidates === 1 ? "" : "s"}</span> : null}</span>}
+      info="Applications created in the period. Between stages: moved on, still at the stage, or exited with the reason recorded on the application."
+      className="lg:col-span-5 lg:row-span-2" testid="dashboard-funnel"
       action={<span className="rounded-full bg-brand-pale px-3 py-1 text-[13px] font-semibold text-brand-deep" data-testid="funnel-overall">Overall conversion: {d.funnel.overall_conversion == null ? "—" : `${d.funnel.overall_conversion}%`}</span>}>
-      {!d.funnel.cohort ? <Unavailable className="min-h-[260px]">No applications created in this period</Unavailable> : (
-        <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-x-4">
-          <div className="flex flex-col items-center gap-[3px]">
-            {st.map((s, i) => {
-              const top = 100 - i * (32 / n), bot = 100 - (i + 1) * (32 / n);
-              const inset = (100 - bot / top * 100) / 2;
-              return (
-                <button key={s.stage} type="button" onClick={() => nav(`/pipeline?status=${encodeURIComponent(s.statuses.join(","))}`)} data-testid={`funnel-stage-${s.stage.toLowerCase().replace(/ /g, "-")}`}
-                  title={`Open ${s.stage} in the pipeline`}
-                  className="group relative flex h-[28px] items-center justify-between gap-2 px-[9%] text-[12.5px] font-semibold transition-[filter,width] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-royal/40 hover:brightness-95"
-                  style={{ width: mounted ? `${top}%` : "40%", clipPath: `polygon(0 0, 100% 0, ${100 - inset}% 100%, ${inset}% 100%)`,
-                    background: i === n - 1 ? "#1B4F9C" : [BRAND.sky, "#93CDFB", "#86C5F9", BRAND.blue, "#5AA4EE", "#4C93E5", BRAND.royal][Math.min(i, 6)],
-                    color: i >= 3 ? "#fff" : "#16325C", transition: `width 700ms ${EASE} ${i * 50}ms` }}>
-                  <span className="truncate">{s.stage}</span><span className="tabular-nums">{s.count}</span>
-                </button>
-              );
-            })}
+      {!d.funnel.cohort ? <Unavailable className="min-h-[260px]">No applications created in this period</Unavailable> : (<>
+        <div className="mb-3 flex flex-wrap gap-x-3.5 gap-y-1 text-[11.5px] text-[#4B5361]">
+          {[["moved", "Moved on"], ["still", "Still here"], ["company", "Exited · company"], ["candidate", "Exited · candidate"], ["hold", "On hold"]].map(([k, l]) => (
+            <span key={k} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: OUT[k] }} />{l}</span>))}
+        </div>
+        <div className="grid grid-cols-[100px_minmax(0,1fr)_56px_46px] gap-x-2 px-1 pb-1 text-[11px] font-medium uppercase tracking-[0.04em] text-subtle">
+          <span>Stage</span><span /><span className="text-right">Conv.</span><span className="text-right">Exited</span>
+        </div>
+        <div className="flex flex-col">
+          {st.map((s, i) => {
+            const g = s.gap, next = st[i + 1], isOpen = open === i;
+            const w = Math.max(12, Math.round((s.count / top) * 100));
+            const dark = i >= n - 2;
+            return (
+              <div key={s.stage}>
+                <div className="grid grid-cols-[100px_minmax(0,1fr)_56px_46px] items-center gap-x-2 px-1">
+                  <button type="button" onClick={() => nav(pipeTo(s.statuses))} className="text-left text-[12.5px] font-medium leading-tight text-ink hover:text-brand-deep">{s.stage}</button>
+                  <button type="button" onClick={() => nav(pipeTo(s.statuses))} title={`Open ${s.stage} in the pipeline`} aria-label={`${s.stage}: ${s.count}. Open in the pipeline`} data-testid={`funnel-stage-${s.stage.toLowerCase().replace(/ /g, "-")}`}
+                    className="flex h-[28px] min-w-[36px] items-center justify-end rounded-[7px] px-2.5 text-[12.5px] font-semibold tabular-nums transition-[filter,width] hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-royal/40"
+                    style={{ width: mounted ? `${w}%` : "20%", background: ["#CFE8FD", "#B8DDFC", BRAND.sky, "#84C5F8", BRAND.blue, "#5FA9EE", "#2F72C9", BRAND.deep][Math.min(i, 7)],
+                      color: dark ? "#fff" : "#0F2E5C", transition: `width 700ms ${EASE} ${i * 50}ms` }}>
+                    {s.count}
+                  </button>
+                  <span className="text-right text-[12.5px] tabular-nums text-ink">{i === 0 ? "—" : s.conversion == null ? "—" : `${s.conversion}%`}</span>
+                  <span className={cn("text-right text-[12.5px] font-semibold tabular-nums", g?.exited ? "text-[#A8322D]" : "text-subtle")} data-testid={`funnel-exited-${i}`}>{g ? g.exited : ""}</span>
+                </div>
+                {g && next && (
+                  <div className="py-0.5">
+                    <button type="button" onClick={() => setOpen(isOpen ? null : i)} aria-expanded={isOpen} data-testid={`funnel-gap-${i}`}
+                      className={cn("flex min-h-[34px] w-full items-center gap-2.5 rounded-[8px] py-1 pl-[110px] pr-2 text-left max-sm:pl-3 transition-colors hover:bg-[#F3F6FA]", isOpen && "bg-brand-mist hover:bg-brand-mist")}>
+                      <span className="flex h-[7px] w-[72px] shrink-0 overflow-hidden rounded-full bg-[#EEF1F5]">
+                        {[["moved", g.moved], ["still", g.still], ...g.exits.map((e) => [e.kind, e.count])].filter(([, c]) => c > 0).map(([k, c], j) => (
+                          <span key={j} style={{ width: `${(c / (s.count || 1)) * 100}%`, background: OUT[k] }} />))}
+                      </span>
+                      <span className="min-w-0 flex-1 text-[12px] leading-snug text-[#4B5361]">
+                        {[`${g.moved} moved on`, g.still ? `${g.still} still here` : null, ...g.exits.filter((e) => e.count).map((e) => `${e.count} ${e.reason}`)].filter(Boolean).join(" · ")}
+                      </span>
+                      <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-subtle transition-transform", isOpen && "rotate-180")} />
+                    </button>
+                    {isOpen && (
+                      <div className="mx-1 mb-1.5 ml-[110px] mt-1 rounded-[10px] max-sm:ml-3 border border-[#DCEBFB] bg-[#F6FAFE] px-3.5 py-3" data-testid={`funnel-gap-detail-${i}`}>
+                        <p className="mb-2 text-[12.5px] font-semibold text-ink">{s.stage} → {next.stage} · {s.count - g.moved} did not move on</p>
+                        <div className="flex flex-col gap-1">
+                          {[{ kind: "still", label: `Still here · ${g.still_label}`, count: g.still, statuses: g.still_statuses }, ...g.exits.map((e) => ({ kind: e.kind, label: `Exited · ${e.reason}`, count: e.count, statuses: [e.reason] }))].map((r) => (
+                            <div key={r.label} className="grid grid-cols-[10px_minmax(0,1fr)_28px_auto] items-center gap-x-2 text-[12.5px]">
+                              <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: OUT[r.kind], opacity: r.count ? 1 : 0.35 }} />
+                              <span className={r.count ? "text-ink" : "text-subtle"}>{r.label}</span>
+                              <span className={cn("text-right font-semibold tabular-nums", r.count ? "text-ink" : "text-subtle")}>{r.count}</span>
+                              {r.count && r.statuses.length ? <Link to={pipeTo(r.statuses)} className="text-right text-[12px] font-medium text-brand-royal hover:text-brand-deep">View →</Link> : <span />}
+                            </div>))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>);
+          })}
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#EEF1F5] pt-3" data-testid="funnel-outcomes">
+          {[["Joined", o.joined, "#2B6A3F"], ["In progress", o.in_progress, "#8A6116"], ["Exited", o.exited, "#A8322D"]].map(([l, v, c]) => (
+            <div key={l}><p className="text-[20px] font-bold tabular-nums" style={{ color: c }}>{v}</p><p className="text-[12px] text-[#4B5361]">{l}</p></div>))}
+        </div>
+      </>)}
+      <p className="mt-3 text-[12px] text-subtle">Counts applications (one candidate can apply to several requisitions) · click a stage to open it, or a gap to see who left and why</p>
+    </Tile>
+  );
+}
+
+function ExitsTile({ d }) {
+  const o = d.funnel.outcomes;
+  if (!o) return null;
+  const max = Math.max(1, ...o.by_reason.map((r) => r.count));
+  const tot = o.exited || 1;
+  return (
+    <Tile title={<span className="flex flex-col">Why candidates leave<span className="text-[13px] font-normal text-subtle">{o.exited} exit{o.exited === 1 ? "" : "s"} in the period · reasons recorded on each application</span></span>}
+      info="Applications created in the period that left the process, by their final status" className="lg:col-span-7" testid="dashboard-exits">
+      {!o.exited ? <Unavailable className="min-h-[140px]">No candidates have left the process in this period</Unavailable> : (
+        <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+          <div className="flex flex-col gap-2">
+            <div className="flex h-3 overflow-hidden rounded-full bg-[#EEF1F5]">
+              {o.by_kind.filter((k) => k.count).map((k) => <span key={k.kind} style={{ width: `${(k.count / tot) * 100}%`, background: OUT[k.kind] }} />)}
+            </div>
+            {o.by_kind.map((k) => (
+              <div key={k.kind} className="flex items-center justify-between text-[12.5px] text-[#4B5361]">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: OUT[k.kind] }} />{k.label}</span>
+                <span className="font-semibold tabular-nums text-ink">{k.count}</span></div>))}
+            <p className="mt-1 text-[12px] text-[#4B5361]"><span className="font-semibold text-[#8A6116]">{o.in_progress} still in progress</span> are not counted as exits.</p>
           </div>
-          <table className="self-start text-[12.5px]">
-            <thead><tr className="text-[11.5px] text-subtle"><th className="pb-1 text-right font-medium">Conversion</th><th className="pb-1 text-right font-medium">Drop-off</th></tr></thead>
-            <tbody>
-              {st.map((s, i) => {
-                const next = st[i + 1];
-                return (
-                  <tr key={s.stage} className="h-[31px] border-b border-[#EEF1F5] last:border-0">
-                    <td className="text-right tabular-nums text-ink">{next ? (next.conversion == null ? "—" : `${next.conversion}%`) : ""}</td>
-                    <td className="text-right tabular-nums text-[#4B5361]">{next ? (next.drop_off ? <>{next.drop_off}<span className="ml-1 text-[11px] text-subtle">({(100 - (next.conversion ?? 100)).toFixed(1)}%)</span></> : "0") : ""}</td>
-                  </tr>);
-              })}
-            </tbody>
-          </table>
+          <div className="flex flex-col gap-2" data-testid="exits-by-reason">
+            {o.by_reason.map((r) => (
+              <Link key={r.reason} to={pipeTo([r.reason])} className="grid grid-cols-[132px_minmax(0,1fr)_28px] items-center gap-x-2.5 rounded-[6px] text-[12.5px] hover:bg-[#F3F6FA]">
+                <span className={r.count ? "text-ink" : "text-subtle"}>{r.reason}</span>
+                <span className="flex h-2 overflow-hidden rounded-full bg-[#EEF1F5]"><span style={{ width: `${(r.count / max) * 100}%`, background: OUT[r.kind] }} /></span>
+                <span className={cn("text-right font-semibold tabular-nums", r.count ? "text-ink" : "text-subtle")}>{r.count}</span>
+              </Link>))}
+          </div>
         </div>
       )}
-      <p className="mt-3 text-[12px] text-subtle">Counts applications (one candidate can apply to several requisitions) · conversion to the next stage · click a stage to open it</p>
     </Tile>
   );
 }
@@ -537,6 +610,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
               <TrendTile d={d} gran={g} setGran={setGran} />
               <FunnelTile d={d} />
+              <ExitsTile d={d} />
               {d.cost && <CostTile c={d.cost} gran={g} />}
               <AgeTile a={d.age_per_hire} gran={g} />
               <SourcesTile s={d.sources} />

@@ -99,7 +99,8 @@ export default function Analytics() {
         </TabsContent>
         <TabsContent value="aph"><AphDetail aph={d.aph} f={f} canExport={can("reports.export")} /></TabsContent>
         <TabsContent value="funnel"><Section title="Recruitment funnel (distinct applications)" actions={<Exp type="funnel" f={f} />}><FunnelChart funnel={d.funnel} />
-          <p className="mt-4 text-[11px] text-[#9AA2AE]">Conversion = stage count ÷ previous stage. Rejected applications count toward the stages they reached (e.g. CV Rejected → screened).</p></Section></TabsContent>
+          <p className="mt-4 text-[11px] text-subtle">Conversion = stage count ÷ previous stage. Rejected applications count toward the stages they reached (e.g. CV Rejected → screened).</p></Section>
+          {d.funnel_outcomes && <FunnelGaps funnel={d.funnel} o={d.funnel_outcomes} />}</TabsContent>
         <TabsContent value="recruiters" className="space-y-4">
           <Section title="Recruiter performance" actions={<Exp type="recruiters" f={f} />}><Bars data={d.recruiters} x="name" bars={[["total", "Managed"], ["in_process", "In process"], ["selected", "Selected"], ["offers_released", "Offers"], ["offers_accepted", "Accepted"], ["joined", "Joined"]]} /></Section>
           <DataTable testid="an-recruiter-table" data={d.recruiters} columns={[{ key: "name", label: "Recruiter" }, { key: "total", label: "Managed" }, { key: "in_process", label: "In process" }, { key: "selected", label: "Selected" }, { key: "offers_released", label: "Offers released" }, { key: "offers_accepted", label: "Accepted" }, { key: "joined", label: "Joined" },
@@ -145,5 +146,35 @@ export default function Analytics() {
         </TabsContent>
       </Tabs>}
     </div>
+  );
+}
+
+
+/* where applications went between stages (same breakdown as the dashboard funnel; included in the Funnel export) */
+function FunnelGaps({ funnel, o }) {
+  const reasons = o.by_reason.map((r) => r.reason);
+  const rows = funnel.filter((s) => s.gap);
+  return (
+    <Section title="Where candidates went between stages" testid="an-funnel-gaps">
+      <p className="mb-3 text-[12.5px] text-[#4B5361]"><b className="text-ink">{o.joined}</b> joined · <b className="text-[#8A6116]">{o.in_progress}</b> still in progress · <b className="text-[#A8322D]">{o.exited}</b> exited. Moved on + still here + exited = the stage's count.</p>
+      <div className="overflow-x-auto rounded-[10px] border border-line">
+        <table className="w-full min-w-[760px] text-[12.5px]">
+          <thead><tr className="bg-canvas text-left text-[11.5px] text-subtle">
+            <th className="px-3 py-2 font-medium">From → to</th><th className="px-2 py-2 text-right font-medium">Moved on</th><th className="px-2 py-2 text-right font-medium">Still here</th>
+            <th className="px-2 py-2 text-right font-medium">Exited</th>{reasons.map((r) => <th key={r} className="px-2 py-2 text-right font-medium">{r}</th>)}</tr></thead>
+          <tbody>{rows.map((s) => {
+            const ex = Object.fromEntries(s.gap.exits.map((e) => [e.reason, e.count]));
+            return (
+              <tr key={s.stage} className="border-t border-[#EEF1F5]">
+                <td className="px-3 py-2 text-ink">{s.stage} → {s.gap.to}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{s.gap.moved}</td>
+                <td className={`px-2 py-2 text-right tabular-nums ${s.gap.still ? "text-[#8A6116]" : "text-subtle"}`}>{s.gap.still}</td>
+                <td className={`px-2 py-2 text-right font-semibold tabular-nums ${s.gap.exited ? "text-[#A8322D]" : "text-subtle"}`}>{s.gap.exited}</td>
+                {reasons.map((r) => <td key={r} className={`px-2 py-2 text-right tabular-nums ${ex[r] ? "text-ink" : "text-subtle"}`}>{ex[r] === undefined ? "–" : ex[r]}</td>)}
+              </tr>);
+          })}</tbody>
+        </table>
+      </div>
+    </Section>
   );
 }
